@@ -110,6 +110,7 @@ BI 側で「その日の利用者数」を正しく出せるよう、日単位�
 |---|---|---|
 | `LogDirectory` | — | ログの置き場所 |
 | `SearchSubdirectories` | `false` | サブフォルダも探すか (`W3SVC1` などに分かれている場合は `true`) |
+| `LogFileNamePattern` | `^(?<date>\d{8})[-_](?<server>.+)\.log$` | ログのファイル名。既定で `20260129-WEB01.log` と `20260129_t8701r.log` の両方に対応 |
 | `OutputDirectory` | — | CSV の出力先 |
 | `Servers` | `[]` | 対象サーバ名。空なら全サーバ |
 | `TargetExtensions` | `[".aspx"]` | 対象拡張子。空にすると全 URL |
@@ -130,6 +131,19 @@ BI 側で「その日の利用者数」を正しく出せるよう、日単位�
 | `OutputEncoding` | `utf8` | `utf8` (BOM 付き) / `utf8nobom` / `shift_jis` |
 | `RetentionDays` | `0` | 出力先の古い CSV を自動削除する日数。`0` で削除しない |
 | `MaxDegreeOfParallelism` | `0` | 並列度。`0` で CPU 数。本番機の負荷を抑えたいときに下げる |
+
+### ログのファイル名が違う場合
+
+既定では `20260129-WEB01.log` と `20260129_t8701r.log` の両方を読みます。
+これ以外の命名なら `LogFileNamePattern` に正規表現を書いてください
+(**`date` と `server` の名前付きグループが必須**です)。JSON なので `\` は `\\` と書きます。
+
+```json
+"LogFileNamePattern": "^(?<server>[a-z0-9]+)\\.(?<date>\\d{8})\\.log$"
+```
+
+対象ファイルが 0 件のときは、何件を見て何で弾いたか (命名不一致 / 対象日以外 / 対象サーバ以外)、
+実際のファイル名の例、フォルダにある日付を警告に出すので、そこから原因を特定できます。
 
 ### 除外 IP の指定例
 

@@ -1,6 +1,7 @@
 {
   "LogDirectory": "C:\\inetpub\\logs\\LogFiles",
   "SearchSubdirectories": false,
+  "LogFileNamePattern": "^(?<date>\\d{8})[-_](?<server>.+)\\.log$",
   "OutputDirectory": "C:\\IISReports\\output",
 
   "Servers": [],

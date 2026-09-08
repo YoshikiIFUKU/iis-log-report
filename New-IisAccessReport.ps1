@@ -224,7 +224,10 @@ try {
 
     $serverFilter = ConvertTo-StringArray (Get-ConfigValue $config 'Servers' @())
     $recurse = [bool](Get-ConfigValue $config 'SearchSubdirectories' $false)
-    $namePattern = '^(?<date>\d{8})-(?<server>.+)\.log$'
+    # 既定では "yyyymmdd-サーバ名.log" と "yyyymmdd_サーバ名.log" の両方を受け付ける。
+    # これ以外の命名の場合は config.json の LogFileNamePattern に正規表現を書く
+    # (date と server の名前付きグループが必要)。
+    $namePattern = [string](Get-ConfigValue $config 'LogFileNamePattern' '^(?<date>\d{8})[-_](?<server>.+)\.log$')
 
     $gciParams = @{ LiteralPath = $logDir; Filter = '*.log'; File = $true }
     if ($recurse) { $gciParams['Recurse'] = $true }
@@ -233,12 +236,21 @@ try {
 
     $entryList = New-Object 'System.Collections.Generic.List[IisLogReport.LogFileEntry]'
     $totalBytes = 0L
+    $scanned = 0; $nameMismatch = 0; $dateMismatch = 0; $serverMismatch = 0
+    $sampleNames = New-Object System.Collections.Generic.List[string]
+    $foundDates = New-Object 'System.Collections.Generic.HashSet[string]'
     foreach ($f in (Get-ChildItem @gciParams)) {
+        $scanned++
         $m = [regex]::Match($f.Name, $namePattern, 'IgnoreCase')
-        if (-not $m.Success) { continue }
-        if (-not $fileDates.Contains($m.Groups['date'].Value)) { continue }
+        if (-not $m.Success) {
+            $nameMismatch++
+            if ($sampleNames.Count -lt 5) { $sampleNames.Add($f.Name) }
+            continue
+        }
+        [void]$foundDates.Add($m.Groups['date'].Value)
+        if (-not $fileDates.Contains($m.Groups['date'].Value)) { $dateMismatch++; continue }
         $server = $m.Groups['server'].Value
-        if ($serverFilter.Count -gt 0 -and ($serverFilter -notcontains $server)) { continue }
+        if ($serverFilter.Count -gt 0 -and ($serverFilter -notcontains $server)) { $serverMismatch++; continue }
         $e = New-Object IisLogReport.LogFileEntry
         $e.Path = $f.FullName
         $e.ServerName = $server
@@ -247,10 +259,43 @@ try {
     }
 
     if ($entryList.Count -eq 0) {
-        Write-Log "対象のログファイルが見つかりませんでした ($logDir)。命名規則 'yyyymmdd-サーバ名.log' を確認してください。" 'WARN'
+        # 「見つからない」で終わらせず、何件を見て何で弾いたかまで出す。
+        Write-Log "対象のログファイルが見つかりませんでした: $logDir" 'WARN'
+        Write-Log ("  .log ファイル {0} 件を確認 (命名不一致 {1} / 対象日以外 {2} / 対象サーバ以外 {3})" -f `
+                $scanned, $nameMismatch, $dateMismatch, $serverMismatch) 'WARN'
+        if ($scanned -eq 0) {
+            Write-Log '  フォルダに .log ファイルがありません。LogDirectory を確認してください。' 'WARN'
+            Write-Log '  サブフォルダ (W3SVC1 など) に分かれている場合は SearchSubdirectories を true にしてください。' 'WARN'
+        }
+        elseif ($nameMismatch -eq $scanned) {
+            Write-Log ("  ファイル名の例: {0}" -f ($sampleNames -join ', ')) 'WARN'
+            Write-Log ("  現在のパターン: {0}" -f $namePattern) 'WARN'
+            Write-Log '  命名が異なる場合は config.json の LogFileNamePattern を調整してください (date / server の名前付きグループが必要)。' 'WARN'
+        }
+        elseif ($dateMismatch -gt 0) {
+            $sorted = @($foundDates) | Sort-Object
+            $shown = ($sorted | Select-Object -First 10) -join ', '
+            if ($sorted.Count -gt 10) { $shown += ' ...' }
+            Write-Log ("  フォルダにある日付: {0}" -f $shown) 'WARN'
+            Write-Log ("  今回探した日付　: {0}" -f ((@($fileDates) | Sort-Object) -join ', ')) 'WARN'
+        }
+        elseif ($serverMismatch -gt 0) {
+            Write-Log ("  config.json の Servers ({0}) に一致するファイルがありません。" -f ($serverFilter -join ', ')) 'WARN'
+        }
     }
     else {
         Write-Log ("対象ログ: {0} ファイル / {1:N1} MB" -f $entryList.Count, ($totalBytes / 1MB))
+
+        # 時差補正があると、対象日の早朝(または深夜)は隣の日付のファイルに入っている。
+        # そのファイルが無いと結果が黙って欠けるので警告する。
+        if ($offsetMinutes -ne 0) {
+            $neighborOffset = if ($offsetMinutes -gt 0) { -1 } else { 1 }
+            $missing = @($targetDates | ForEach-Object { $_.AddDays($neighborOffset).ToString('yyyyMMdd') } |
+                Where-Object { -not $foundDates.Contains($_) } | Sort-Object -Unique)
+            if ($missing.Count -gt 0) {
+                Write-Log ("時差補正のため {0} のログも必要ですが見つかりません。対象日の一部の時間帯が欠落します。" -f ($missing -join ', ')) 'WARN'
+            }
+        }
     }
 
     # ---- オプション組み立て --------------------------------------------
