@@ -360,10 +360,10 @@ try {
             $tmp = "$path.tmp"
             $w = New-CsvWriter -Path $tmp -Encoding $encoding
             try {
-                $w.WriteLine('ServerName,LogDate,PageUrl,PageViews,UniqueUsers,UniqueIps,AvgTimeTakenMs,MaxTimeTakenMs,ErrorCount')
+                $w.WriteLine('ServerName,LogDate,PageUrl,PageUrlDisplay,PageViews,UniqueUsers,UniqueIps,AvgTimeTakenMs,MaxTimeTakenMs,ErrorCount')
                 foreach ($r in $rows) {
-                    $w.WriteLine(('{0},{1},{2},{3},{4},{5},{6},{7},{8}' -f `
-                        (Get-CsvField $r.ServerName), $r.LogDate, (Get-CsvField $r.PageUrl),
+                    $w.WriteLine(('{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}' -f `
+                        (Get-CsvField $r.ServerName), $r.LogDate, (Get-CsvField $r.PageUrl), (Get-CsvField $r.PageUrlDisplay),
                             $r.PageViews, $r.UniqueUsers, $r.UniqueIps, $r.AvgTimeTakenMs, $r.MaxTimeTakenMs, $r.ErrorCount))
                 }
             }

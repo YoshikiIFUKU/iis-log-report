@@ -72,13 +72,31 @@ IIS の W3C ログから、BI ツールの元データにする日次 CSV を生
 |---|---|
 | ServerName | ログのファイル名から取得したサーバ名 |
 | LogDate | 日付 (`yyyy-MM-dd`、時差補正後) |
-| PageUrl | ページ URL。`http(s)://サーバ名` とクエリ文字列を除いたパス |
+| PageUrl | 名寄せ後のページ URL。`http(s)://サーバ名` とクエリ文字列を除いたパス (`LowercaseUrl` が `true` なら小文字) |
+| PageUrlDisplay | 表示用の URL。ログに最も多く現れた元の表記をそのまま出す |
 | PageViews | アクセス回数 |
 | UniqueUsers | アクセス人数。`cs-username` があればユーザー、なければ IP で数える |
 | UniqueIps | ユニーク IP 数 |
 | AvgTimeTakenMs | 平均応答時間 (ミリ秒) |
 | MaxTimeTakenMs | 最大応答時間 (ミリ秒) |
 | ErrorCount | ステータス 400 以上の件数 |
+
+#### URL の名寄せと表記について
+
+IIS (Windows) の URL は大文字小文字を区別しないため、同じページでもログには
+`/Order/List.aspx` と `/order/list.aspx` が混在します。そのまま数えると 1 つのページが
+複数行に分かれてしまうので、**小文字に揃えたものを集計キー (`PageUrl`) にしています。**
+
+ただし小文字だけだと読みにくいので、**ログに最も多く現れた元の表記を `PageUrlDisplay` に残します。**
+
+| PageUrl | PageUrlDisplay | PageViews |
+|---|---|---|
+| `/order/list.aspx` | `/Order/List.aspx` | 167 |
+| `/report/summary.aspx` | `/report/Summary.aspx` | 182 |
+
+BI では **`PageUrl` でグループ化し、`PageUrlDisplay` を表示に使う**のが安全です
+(表記が揺れても集計は 1 行にまとまります)。名寄せ自体が不要なら `LowercaseUrl` を
+`false` にしてください。その場合は表記ごとに別行として出力されます。
 
 ### `iis_daily_yyyymmdd.csv` — サーバ × 日のサマリ
 
@@ -116,7 +134,7 @@ BI 側で「その日の利用者数」を正しく出せるよう、日単位�
 | `TargetExtensions` | `[".aspx"]` | 対象拡張子。空にすると全 URL |
 | `IncludeMethods` | `["GET","POST"]` | 対象 HTTP メソッド。空なら全部 |
 | `ExcludeStatusCodes` | `[]` | 集計から外すステータス (例 `[404]`) |
-| `LowercaseUrl` | `true` | URL を小文字に寄せて名寄せする |
+| `LowercaseUrl` | `true` | URL を小文字に寄せて名寄せする。元の表記は `PageUrlDisplay` 列に残る |
 | `StripTrailingSlash` | `false` | 末尾スラッシュを落として名寄せする |
 | `ExcludeIpAddresses` | `["127.0.0.1","::1"]` | 除外する IP (完全一致。IPv6 可) |
 | `ExcludeIpRanges` | 社内 IP 帯 | 除外する IP レンジ (IPv4 CIDR) |
@@ -161,6 +179,7 @@ BI 側で「その日の利用者数」を正しく出せるよう、日単位�
 
 - **Power BI**: 「フォルダーから」→ `iis_page_*.csv` を結合。日次で追加されたファイルは更新時に自動で取り込まれます
 - 日付は `LogDate` (`yyyy-MM-dd`) をそのまま日付型に変換できます
+- ページはグループ化に `PageUrl`、表示に `PageUrlDisplay` を使ってください
 - 人数を見るときは `iis_daily_*.csv` を使ってください (ページ別の `UniqueUsers` は合計できません)
 
 ## 運用上の注意

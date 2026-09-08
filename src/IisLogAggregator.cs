@@ -49,7 +49,8 @@ namespace IisLogReport
     {
         public string ServerName;
         public string LogDate;
-        public string PageUrl;
+        public string PageUrl;         // 名寄せ後のキー (LowercaseUrl が true なら小文字)
+        public string PageUrlDisplay;  // 表示用。ログに最も多く現れた元の表記
         public long PageViews;
         public int UniqueUsers;
         public int UniqueIps;
@@ -95,6 +96,9 @@ namespace IisLogReport
         public long Errors;
         public HashSet<int> Users = new HashSet<int>();
         public HashSet<int> Ips = new HashSet<int>();
+        // 元の URL 表記ごとの出現回数。小文字で名寄せしつつ、表示用に一番多かった
+        // 表記を選ぶために持つ (ページ集計だけで使い、日次集計では null のまま)。
+        public Dictionary<string, long> Variants;
     }
 
     internal class Counters
@@ -205,6 +209,19 @@ namespace IisLogReport
                 if (kv.Value.TimeMax > b.TimeMax) b.TimeMax = kv.Value.TimeMax;
                 b.Users.UnionWith(kv.Value.Users);
                 b.Ips.UnionWith(kv.Value.Ips);
+                if (kv.Value.Variants != null)
+                {
+                    if (b.Variants == null) { b.Variants = kv.Value.Variants; }
+                    else
+                    {
+                        foreach (var v in kv.Value.Variants)
+                        {
+                            long n;
+                            b.Variants.TryGetValue(v.Key, out n);
+                            b.Variants[v.Key] = n + v.Value;
+                        }
+                    }
+                }
             }
         }
 
@@ -310,9 +327,11 @@ namespace IisLogReport
                     if (logDate == null) { c.Malformed++; continue; }
                     if (targetDates.Count > 0 && !targetDates.Contains(logDate)) { c.SkipRange++; continue; }
 
-                    if (o.LowercaseUrl) url = url.ToLowerInvariant();
                     if (o.StripTrailingSlash && url.Length > 1 && url[url.Length - 1] == '/')
                         url = url.Substring(0, url.Length - 1);
+                    // 小文字化は集計キーだけに効かせ、元の表記は display に残す。
+                    string display = url;
+                    if (o.LowercaseUrl) url = url.ToLowerInvariant();
 
                     // 認証ユーザーがいればそれを、いなければ IP を「人」とみなす。
                     string identity = null;
@@ -329,14 +348,15 @@ namespace IisLogReport
                     int userId = identity == null ? ipId : GetId(identity);
 
                     string key = serverName + "\t" + logDate + "\t" + url;
-                    Accumulate(agg, key, taken, status, ipId, userId);
-                    Accumulate(aggDaily, serverName + "\t" + logDate, taken, status, ipId, userId);
+                    Accumulate(agg, key, taken, status, ipId, userId, o.LowercaseUrl ? display : null);
+                    Accumulate(aggDaily, serverName + "\t" + logDate, taken, status, ipId, userId, null);
                     c.Counted++;
                 }
             }
         }
 
-        private static void Accumulate(Dictionary<string, Bucket> agg, string key, int taken, int status, int ipId, int userId)
+        private static void Accumulate(Dictionary<string, Bucket> agg, string key, int taken, int status,
+                                       int ipId, int userId, string variant)
         {
             Bucket b;
             if (!agg.TryGetValue(key, out b)) { b = new Bucket(); agg[key] = b; }
@@ -346,6 +366,30 @@ namespace IisLogReport
             if (status >= 400) b.Errors++;
             b.Ips.Add(ipId);
             b.Users.Add(userId);
+            if (variant != null)
+            {
+                if (b.Variants == null) b.Variants = new Dictionary<string, long>(StringComparer.Ordinal);
+                long n;
+                b.Variants.TryGetValue(variant, out n);
+                b.Variants[variant] = n + 1;
+            }
+        }
+
+        /// <summary>元表記のうち一番多かったものを返す。同数なら順序で決めて実行ごとにぶれないようにする。</summary>
+        private static string PickDisplayUrl(Dictionary<string, long> variants, string fallback)
+        {
+            if (variants == null || variants.Count == 0) return fallback;
+            string best = null;
+            long bestCount = -1;
+            foreach (var kv in variants)
+            {
+                if (kv.Value > bestCount || (kv.Value == bestCount && string.CompareOrdinal(kv.Key, best) < 0))
+                {
+                    best = kv.Key;
+                    bestCount = kv.Value;
+                }
+            }
+            return best;
         }
 
         /// <summary>maxIndex までのフィールドだけを空白区切りで切り出す。全体 Split よりアロケーションが少ない。</summary>
@@ -402,6 +446,7 @@ namespace IisLogReport
                 var b = kv.Value;
                 var r = new PageRow();
                 r.ServerName = parts[0]; r.LogDate = parts[1]; r.PageUrl = parts[2];
+                r.PageUrlDisplay = PickDisplayUrl(b.Variants, r.PageUrl);
                 r.PageViews = b.Hits; r.UniqueUsers = b.Users.Count; r.UniqueIps = b.Ips.Count;
                 r.AvgTimeTakenMs = b.Hits > 0 ? Math.Round((double)b.TimeSum / b.Hits, 1) : 0;
                 r.MaxTimeTakenMs = b.TimeMax; r.ErrorCount = b.Errors;
