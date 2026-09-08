@@ -74,6 +74,27 @@ function Get-ConfigValue {
     return $Default
 }
 
+function Read-ConfigFile {
+    param([string]$Path)
+    $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+    try { return ($raw | ConvertFrom-Json) }
+    catch {
+        # JSON ではバックスラッシュがエスケープ文字なので、Windows のパスを
+        # "C:\inetpub\logs" と 1 つで書くと「認識できないエスケープシーケンス」で失敗する。
+        # よくある間違いなので、無効なエスケープだけを二重化して読み直す。
+        # (すでに正しく "\\" と書かれている箇所には手を触れない)
+        $fixed = [regex]::Replace($raw, '(?<!\\)((?:\\\\)*)\\(?!["\\/bfnrtu])', '$1\\')
+        $config = $null
+        try { $config = $fixed | ConvertFrom-Json }
+        catch {
+            throw ("設定ファイルの JSON を解釈できませんでした: {0}`n  {1}" -f $Path, $_.Exception.Message)
+        }
+        Write-Log ("設定ファイルのバックスラッシュがエスケープされていないため、自動補正して読み込みました: {0}" -f $Path) 'WARN'
+        Write-Log '  恒久対応: パスは "C:\\inetpub\\logs" のように \ を 2 つ重ねるか、"C:/inetpub/logs" と書いてください。' 'WARN'
+        return $config
+    }
+}
+
 function ConvertTo-StringArray {
     param($Value)
     if ($null -eq $Value) { return @() }
@@ -140,7 +161,7 @@ try {
     $root = $PSScriptRoot
     if (-not $ConfigPath) { $ConfigPath = Join-Path $root 'config.json' }
     if (-not (Test-Path -LiteralPath $ConfigPath)) { throw "設定ファイルが見つかりません: $ConfigPath" }
-    $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $config = Read-ConfigFile -Path $ConfigPath
 
     $logDir = if ($LogDirectory) { $LogDirectory } else { [string](Get-ConfigValue $config 'LogDirectory' '') }
     $outDir = if ($OutputDirectory) { $OutputDirectory } else { [string](Get-ConfigValue $config 'OutputDirectory' '') }
