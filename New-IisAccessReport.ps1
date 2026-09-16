@@ -239,6 +239,7 @@ try {
     $scanned = 0; $nameMismatch = 0; $dateMismatch = 0; $serverMismatch = 0
     $sampleNames = New-Object System.Collections.Generic.List[string]
     $foundDates = New-Object 'System.Collections.Generic.HashSet[string]'
+    $entryFileDates = @{}   # ファイルパス -> ファイル名の日付 (yyyyMMdd)
     foreach ($f in (Get-ChildItem @gciParams)) {
         $scanned++
         $m = [regex]::Match($f.Name, $namePattern, 'IgnoreCase')
@@ -255,6 +256,7 @@ try {
         $e.Path = $f.FullName
         $e.ServerName = $server
         $entryList.Add($e)
+        $entryFileDates[$f.FullName] = $m.Groups['date'].Value
         $totalBytes += $f.Length
     }
 
@@ -345,6 +347,25 @@ try {
         $dailyByDate[$r.LogDate].Add($r)
     }
 
+    # 対象ページへのアクセスが 0 件でも、その日のログを読めたサーバは 0 の行として出す。
+    # 「アクセスが無かった」と「ログが無かった」を区別するため、対象日と同じ日付の
+    # ログファイルを読み込めたサーバだけを対象にする (ファイルが無い・読めない場合は行を出さない)。
+    $failedPaths = New-Object 'System.Collections.Generic.HashSet[string]'
+    foreach ($err in $result.Errors) {
+        foreach ($e in $entryList) {
+            if ($err.StartsWith($e.Path + ': ', [StringComparison]::Ordinal)) { [void]$failedPaths.Add($e.Path) }
+        }
+    }
+    $loggedServersByDate = @{}   # yyyyMMdd -> サーバ名の集合
+    foreach ($e in $entryList) {
+        if ($failedPaths.Contains($e.Path)) { continue }
+        $fd = $entryFileDates[$e.Path]
+        if (-not $loggedServersByDate.ContainsKey($fd)) {
+            $loggedServersByDate[$fd] = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+        }
+        [void]$loggedServersByDate[$fd].Add($e.ServerName)
+    }
+
     foreach ($d in $targetDates) {
         $iso = $d.ToString('yyyy-MM-dd')
         $stamp = $d.ToString('yyyyMMdd')
@@ -382,20 +403,37 @@ try {
                 Write-Log "既に存在するためスキップします (上書きするには -Force): $dpath" 'WARN'
             }
             else {
-                $drows = if ($dailyByDate.ContainsKey($iso)) { $dailyByDate[$iso] } else { @() }
+                $drows = New-Object System.Collections.Generic.List[object]
+                if ($dailyByDate.ContainsKey($iso)) { $drows.AddRange($dailyByDate[$iso]) }
+                $zeroCount = 0
+                if ($loggedServersByDate.ContainsKey($stamp)) {
+                    $present = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+                    foreach ($r in $drows) { [void]$present.Add($r.ServerName) }
+                    foreach ($server in $loggedServersByDate[$stamp]) {
+                        if ($present.Contains($server)) { continue }
+                        $z = New-Object IisLogReport.DailyRow
+                        $z.ServerName = $server
+                        $z.LogDate = $iso
+                        $drows.Add($z)
+                        $zeroCount++
+                    }
+                }
+                $drows = @($drows | Sort-Object -Property ServerName -CaseSensitive)
                 $tmp = "$dpath.tmp"
                 $w = New-CsvWriter -Path $tmp -Encoding $encoding
                 try {
                     $w.WriteLine('ServerName,LogDate,PageViews,UniqueUsers,UniqueIps,PageCount,AvgTimeTakenMs,ErrorCount')
                     foreach ($r in $drows) {
+                        # アクセス 0 件の平均応答時間は「0 ミリ秒」ではなく値なしなので空欄にする
+                        $avg = if ($r.PageViews -gt 0) { $r.AvgTimeTakenMs } else { '' }
                         $w.WriteLine(('{0},{1},{2},{3},{4},{5},{6},{7}' -f `
                             (Get-CsvField $r.ServerName), $r.LogDate, $r.PageViews, $r.UniqueUsers,
-                                $r.UniqueIps, $r.PageCount, $r.AvgTimeTakenMs, $r.ErrorCount))
+                                $r.UniqueIps, $r.PageCount, $avg, $r.ErrorCount))
                     }
                 }
                 finally { $w.Dispose() }
                 Move-Item -LiteralPath $tmp -Destination $dpath -Force
-                Write-Log ("出力: {0} ({1:N0} 行)" -f $dpath, $drows.Count)
+                Write-Log ("出力: {0} ({1:N0} 行, うちアクセス 0 件のサーバ {2} 行)" -f $dpath, $drows.Count, $zeroCount)
             }
         }
     }
