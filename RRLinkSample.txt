@@ -159,57 +159,105 @@ body
 
 .modal-overlay
 {
+	/* 背景だけを半透明にする。不透明度をここに置くと子要素（ダイアログ本体）まで
+	   薄く透けてしまうため、半透明は background-color の rgba だけで表現する */
 	display: none;
 	position: fixed;
 	left: 0;
 	top: 0;
 	width: 100%;
 	height: 100%;
-	background-color: #666;
-	filter: alpha(opacity=50);
+	background-color: rgba(0, 0, 0, 0.45);
 	z-index: 1000;
 }
 
 .modal-box
 {
 	position: relative;
-	margin: 60px auto 0 auto;
-	width: 520px;
-	max-height: 460px;
+	box-sizing: border-box;
+	margin: 4% auto 0 auto;
+	width: 90%;
+	max-width: 680px;
+	min-width: 360px;
+	max-height: 84%;
 	overflow: auto;
 	background-color: Window;
 	color: WindowText;
 	border: 1px solid #999;
 	border-radius: 6px;
-	box-shadow: 0 0 20px 2px rgba(0, 0, 0, 0.5);
-	padding: 1em;
+	box-shadow: 0 4px 24px 2px rgba(0, 0, 0, 0.5);
+	padding: 1em 1.2em 1.2em 1.2em;
 }
 
 .modal-box h2
 {
-	margin: 0 0 0.5em 0;
+	margin: 0 0 0.7em 0;
+	padding-right: 1.6em;
 	font-size: 15px;
+}
+
+.modal-close
+{
+	position: absolute;
+	right: 0.6em;
+	top: 0.6em;
+	width: 24px;
+	height: 24px;
+	line-height: 22px;
+	text-align: center;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	cursor: pointer;
+	background-color: #f5f5f5;
+	font-size: 14px;
+}
+
+.attr-rows
+{
+	display: table;
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0 8px;
 }
 
 .attr-row
 {
-	margin-bottom: 0.4em;
-	white-space: nowrap;
+	display: table-row;
 }
 
-.attr-row select
+.attr-row .attr-cell
+{
+	display: table-cell;
+	vertical-align: middle;
+	padding-right: 8px;
+}
+
+.attr-row .attr-cell-key
 {
 	width: 230px;
 }
 
-.attr-row input[type="text"]
+.attr-row .attr-cell-value
 {
-	width: 170px;
+	width: 100%;
+}
+
+.attr-row .attr-cell-value .textbox
+{
+	box-sizing: border-box;
+	width: 100%;
+}
+
+.attr-row .attr-cell-remove
+{
+	width: 1%;
+	padding-right: 0;
+	white-space: nowrap;
 }
 
 .modal-actions
 {
-	margin-top: 0.5em;
+	margin-top: 0.8em;
 }
 </style>
 
@@ -1078,6 +1126,9 @@ function CreateAttributeRow() {
 	var row = document.createElement('div');
 	row.className = 'attr-row';
 
+	var keyCell = document.createElement('div');
+	keyCell.className = 'attr-cell attr-cell-key';
+
 	var select = document.createElement('select');
 	select.className = 'select';
 
@@ -1092,13 +1143,21 @@ function CreateAttributeRow() {
 		opt.text = ConversationAttributeKeys[i][1];
 		select.appendChild(opt);
 	}
-	row.appendChild(select);
+	keyCell.appendChild(select);
+	row.appendChild(keyCell);
+
+	var valueCell = document.createElement('div');
+	valueCell.className = 'attr-cell attr-cell-value';
 
 	var input = document.createElement('input');
 	input.type = 'text';
 	input.className = 'textbox';
 	input.maxLength = 256;
-	row.appendChild(input);
+	valueCell.appendChild(input);
+	row.appendChild(valueCell);
+
+	var removeCell = document.createElement('div');
+	removeCell.className = 'attr-cell attr-cell-remove';
 
 	var removeButton = document.createElement('input');
 	removeButton.type = 'button';
@@ -1107,7 +1166,8 @@ function CreateAttributeRow() {
 	removeButton.onclick = function() {
 		row.parentNode.removeChild(row);
 	};
-	row.appendChild(removeButton);
+	removeCell.appendChild(removeButton);
+	row.appendChild(removeCell);
 
 	return row;
 }
@@ -1203,8 +1263,9 @@ window.onbeforeunload = function() {
 
 		<div id="RRLinkClientAttributesOverlay" class="modal-overlay">
 			<div class="modal-box">
+				<span class="modal-close" title="閉じる" onclick="CloseAttributesPanel()">×</span>
 				<h2>通話属性をまとめて設定</h2>
-				<div id="RRLinkClientAttributesRows"></div>
+				<div id="RRLinkClientAttributesRows" class="attr-rows"></div>
 				<div class="modal-actions">
 					<input type="button" class="button" value="行を追加" onclick="AddAttributeRow()" />
 					<input type="button" class="button" value="設定して確定 (Flush)" onclick="ApplyAttributes()" />
