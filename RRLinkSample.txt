@@ -1005,8 +1005,17 @@ var RRLinkClient = (function() {
 
 			TraceLog(MessageType.Info, 'LaunchChannelSwitcher が呼び出されました。');
 			try {
+				// パスはテキストボックスから取得する（画面表示時に設定ファイルの値が入っている）
+				var pathValue = document.getElementById('RRLinkClientChannelSwitcherPath').value;
+				if (!pathValue) {
+					pathValue = ChannelSwitcherRelativePath;
+				}
+
 				var fso = new ActiveXObject('Scripting.FileSystemObject');
-				var exePath = fso.BuildPath(ScriptDir, ChannelSwitcherRelativePath);
+				// ドライブレター（C:\...）や UNC（\\...）で始まる場合は絶対パスとしてそのまま使う。
+				// それ以外は、この HTA と同じフォルダからの相対パスとして解決する
+				var isAbsolute = /^[a-zA-Z]:[\\\/]/.test(pathValue) || /^\\\\/.test(pathValue);
+				var exePath = isAbsolute ? pathValue : fso.BuildPath(ScriptDir, pathValue);
 				if (!fso.FileExists(exePath)) {
 					// 仮想オーディオデバイス／ChannelSwitcher.exe が未配置な環境向けに、
 					// ここでは Trace として記録するだけで画面には表示しない
@@ -1030,10 +1039,11 @@ var RRLinkClient = (function() {
 })();
 
 
-// ---------- サービス名の保存・読み込み ----------
+// ---------- サービス名・ChannelSwitcher パスの保存・読み込み ----------
 
 function LoadSettings() {
 	var serviceName = DefaultServiceName;
+	var channelSwitcherPath = ChannelSwitcherRelativePath;
 	try {
 		if (SettingsPath) {
 			var fso = new ActiveXObject('Scripting.FileSystemObject');
@@ -1050,6 +1060,8 @@ function LoadSettings() {
 					var val = lines[i].substring(eq + 1);
 					if (key === 'serviceName' && val.length) {
 						serviceName = val;
+					} else if (key === 'channelSwitcherPath' && val.length) {
+						channelSwitcherPath = val;
 					}
 				}
 			}
@@ -1058,6 +1070,7 @@ function LoadSettings() {
 		// 設定ファイルが読めない場合は既定値をそのまま使う
 	}
 	document.getElementById('RRLinkClientServiceName').value = serviceName;
+	document.getElementById('RRLinkClientChannelSwitcherPath').value = channelSwitcherPath;
 }
 
 function SaveSettings() {
@@ -1070,6 +1083,7 @@ function SaveSettings() {
 		}
 		var ts = fso.CreateTextFile(SettingsPath, true);
 		ts.WriteLine('serviceName=' + document.getElementById('RRLinkClientServiceName').value);
+		ts.WriteLine('channelSwitcherPath=' + document.getElementById('RRLinkClientChannelSwitcherPath').value);
 		ts.Close();
 	} catch (e) {
 		// 保存に失敗しても致命的ではないため、ここでは何もしない
@@ -1222,6 +1236,8 @@ window.onload = function() {
 	window.resizeTo(780, 620);
 	LoadSettings();
 	Connect();
+	// 起動時に ChannelSwitcher.exe も一緒に立ち上げる（見つからない場合は静かに無視される）
+	RRLinkClient.LaunchChannelSwitcher();
 };
 
 // 終了時の処理
@@ -1255,7 +1271,11 @@ window.onbeforeunload = function() {
 			</div>
 
 			<div class="panel">
-				<input type="button" class="button" value="チャンネル切替/音声再生ツールを起動" onclick="RRLinkClient.LaunchChannelSwitcher()" />
+				<label class="label" for="RRLinkClientChannelSwitcherPath">
+					ChannelSwitcher.exe のパス:
+					<input type="text" class="textbox" id="RRLinkClientChannelSwitcherPath" style="width: 320px;" onchange="SaveSettings()" placeholder="相対パス(HTAと同じフォルダ基準)または絶対パス" />
+				</label>
+				<input type="button" class="button" value="起動" onclick="RRLinkClient.LaunchChannelSwitcher()" />
 			</div>
 		</form>
 
