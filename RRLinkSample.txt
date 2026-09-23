@@ -1000,12 +1000,16 @@ var RRLinkClient = (function() {
 		},
 
 
-		LaunchChannelSwitcher: function() {
+		LaunchChannelSwitcher: function(silent) {
 			/// <summary>
 			/// チャンネル振り分け・音声再生ツール（ChannelSwitcher.exe）を別プロセスとして起動します。
-			/// 仮想オーディオデバイスが未設定などの理由で起動に失敗しても、ここでは画面には表示しません。
+			/// silent が true の場合（起動時の自動実行など）は、失敗しても画面には表示しません。
+			/// ボタンから明示的に呼び出した場合（silent が偽）は、失敗理由を警告として表示します。
 			/// </summary>
+			/// <param name="silent" type="Boolean" mayBeNull="true">失敗を画面に表示しない場合は <c>true</c>。</param>
 			/// <returns type="Boolean">起動できた場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			var failureType = silent ? MessageType.Trace : MessageType.Warn;
 
 			TraceLog(MessageType.Info, 'LaunchChannelSwitcher が呼び出されました。');
 			try {
@@ -1015,15 +1019,21 @@ var RRLinkClient = (function() {
 					pathValue = ChannelSwitcherRelativePath;
 				}
 
+				// 前後の空白と、Explorer の「パスのコピー」で付く二重引用符を取り除く
+				pathValue = pathValue.replace(/^\s+|\s+$/g, '');
+				if (pathValue.charAt(0) === '"' && pathValue.charAt(pathValue.length - 1) === '"') {
+					pathValue = pathValue.substring(1, pathValue.length - 1);
+				}
+
 				var fso = new ActiveXObject('Scripting.FileSystemObject');
 				// ドライブレター（C:\...）や UNC（\\...）で始まる場合は絶対パスとしてそのまま使う。
 				// それ以外は、この HTA と同じフォルダからの相対パスとして解決する
 				var isAbsolute = /^[a-zA-Z]:[\\\/]/.test(pathValue) || /^\\\\/.test(pathValue);
 				var exePath = isAbsolute ? pathValue : fso.BuildPath(ScriptDir, pathValue);
 				if (!fso.FileExists(exePath)) {
-					// 仮想オーディオデバイス／ChannelSwitcher.exe が未配置な環境向けに、
-					// ここでは Trace として記録するだけで画面には表示しない
-					TraceLog(MessageType.Trace, 'ChannelSwitcher.exe が見つかりません: ' + exePath);
+					// silent なら仮想オーディオデバイス／ChannelSwitcher.exe が未配置な環境向けに
+					// Trace として記録するだけで画面には表示しない。ボタン操作時は Warn として表示する
+					TraceLog(failureType, 'ChannelSwitcher.exe が見つかりません: ' + exePath);
 					return false;
 				}
 
@@ -1032,8 +1042,8 @@ var RRLinkClient = (function() {
 				TraceLog(MessageType.Info, 'ChannelSwitcher.exe を起動しました: ' + exePath);
 				return true;
 			} catch (e) {
-				// 同上の理由でここでも画面には表示しない
-				TraceLog(MessageType.Trace, 'ChannelSwitcher.exe の起動に失敗しました。', e);
+				// 同上の理由で silent なら画面には表示しない
+				TraceLog(failureType, 'ChannelSwitcher.exe の起動に失敗しました。', e);
 				return false;
 			} finally {
 				TraceLog(MessageType.Info, 'LaunchChannelSwitcher が終了しました。');
@@ -1241,7 +1251,7 @@ window.onload = function() {
 	LoadSettings();
 	Connect();
 	// 起動時に ChannelSwitcher.exe も一緒に立ち上げる（見つからない場合は静かに無視される）
-	RRLinkClient.LaunchChannelSwitcher();
+	RRLinkClient.LaunchChannelSwitcher(true);
 };
 
 // 終了時の処理
