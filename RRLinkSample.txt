@@ -273,7 +273,11 @@ var ChannelSwitcherRelativePath = 'channel-switcher\\dist\\ChannelSwitcher.exe';
 // このスクリプトが置かれているフォルダを取得する
 var ScriptDir = (function() {
 	try {
-		var path = unescape(location.pathname);
+		// location.pathname は UTF-8 で %XX エンコードされているため、
+		// unescape() ではなく decodeURIComponent() でデコードする
+		// （unescape() は日本語などのマルチバイト文字を1バイトずつ誤って解釈し、
+		//  パスに日本語フォルダ名が含まれていると壊れてしまう）
+		var path = decodeURIComponent(location.pathname);
 		if (path.charAt(0) === '/') {
 			path = path.substring(1);
 		}
