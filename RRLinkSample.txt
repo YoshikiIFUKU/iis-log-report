@@ -1,0 +1,1216 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja" lang="ja">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta http-equiv="Content-Language" content="ja" />
+		<meta http-equiv="Content-Style-Type" content="text/css" />
+		<meta http-equiv="Content-Script-Type" content="text/javascript" />
+		<meta http-equiv="X-UA-Compatible" content="IE=9" />
+		<HTA:APPLICATION ID="thisHta" APPLICATIONNAME="RRLinkSample" CONTEXTMENU="no" INNERBORDER="no" MAXIMIZEBUTTON="no" SINGLEINSTANCE="yes" />
+		<title>AmiVoice RealTimeRecorderLinkClient Test</title>
+<style type="text/css">
+html,
+body
+{
+	margin: 0;
+	padding: 0;
+	height: 100%;
+}
+
+body
+{
+	background-color: Window;
+	color: WindowText;
+	font-family: sans-serif;
+	box-sizing: border-box;
+	font-size: 14px;
+}
+
+.panels
+{
+	margin: 0;
+	padding: 0.5em 0.5em 0 0.5em;
+}
+
+.panel
+{
+	display: inline-block;
+	vertical-align: top;
+	margin: 0 0.5em 0.5em 0;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	padding: 0.5em;
+	white-space: nowrap;
+	background-color: #f5f5f5;
+}
+
+.label,
+.button,
+.textbox,
+.select
+{
+	margin: 0 6px 0 0;
+}
+
+.button
+{
+	padding: 4px 16px;
+	cursor: pointer;
+	font-size: 14px;
+}
+
+.object-firefox
+{
+	position: absolute;
+	top: 20px;
+	right: 20px;
+	z-index: 10000;
+	box-shadow: 0 0 10px 2px rgba(100, 100, 100, 0.4);
+}
+
+.output
+{
+	margin: 0 0.5em 0.5em 0.5em;
+	height: 360px;
+	box-sizing: border-box;
+	border: 2px solid #fff;
+	border-radius: 4px;
+	overflow: auto;
+	line-height: 1.3em;
+	box-shadow: 0 0 10px 2px rgba(100, 100, 100, 0.4);
+	background-color: #333;
+}
+
+.log
+{
+	display: table-row;
+	color: #ddd;
+}
+
+.log-error
+{
+	color: #f00;
+}
+
+.log-warning
+{
+	color: #ff0;
+}
+
+.log-trace
+{
+	color: #090;
+}
+
+.icon
+{
+	display: table-cell;
+	width: 16px;
+	height: 16px;
+	line-height: 16px;
+	padding: 0.25em 6px 0 0.5em;
+	background-repeat: no-repeat;
+	background-position: 0.5em 6px;
+	text-indent: -10000px;
+	vertical-align: top;
+}
+
+.icon-error
+{
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACp0lEQVR42qXSW0jTURwH8O/5/93mLm460alFXrKLqQ8aNUzRB6NWhOYG9ZDYlYiSHgoCs4d6qIwIiuipIOmtqClYUZEIhlDgbTIvealR7T6bm3Nz2///P/2bEURlRQd+L79zzuf8+HII/nOR5TYnduw+zjGMuuSJue2fgcltdRfT9BvO0kgY9pEPl8pedLb+NTCztb5cWZo3oM0GGI8PDi+B2xXauOl55+AfAZuhQQZ58pCudl0RlSiBJCmY0QFYJ4LjvEDK9M86ossDVQZjanXxI0VBOiSHWxI97vp5eF9bMOXjTTXdXebfAk5Dg4pZqZtPXasAL0+DvPlcoh+5eRns2zFMeHmE4kJKZcf90C8Be239Xc2eqgPEOQOiy4f82JlEP3ThFBjLMGJqHd5Me9sNfd0HfwKc2435is3F76TZFLHeV2BzC6Fsu5PYCx4yguvtgUq3Av2TPszMLhQ00dD7HwBX9c6+lNq8Lfz4EDi7ExJ9DVRX25eA5n3gerohS88BNx/H4yl7b+OCv+Y74JRkmGT1+oeyXBacKwAhMAd21Rqk3HqQAAL7d0KwWEEVadDwBFbHHPpn/aYjkaA5AXhyi9zKE9WZ/MgYaJIMiAsQnB+B1JzEC9zoINisQtAonyg1R2C22YN75/0a4ma0JxWnG26A84EGwqACheD1gl29Hqpr90Aog8BRE4RhCyDXgC7yUHHAp0AEXS53C/FXVMakxlIJb50Wvx0B5UXAaUdSeSVUbbe/ZdAkZvBSnCgDNMwDUQ5agcVTlwfkc0UVTW4qA52yAQJA4xwYsQSHGGRdI4hKjciVViRn5YFGqHhZABFLGiPocjiWQvQWl1CqlYVonAf3dQLxXDy6iLjNJpo8hMwcUFaGOMeD5wRxSgHu8KJql99DvgBZsjDj7AAlKgAAAABJRU5ErkJggg==);
+}
+
+.icon-warning
+{
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACm0lEQVR42qWSW0hUURiF1xnPmfuMjqGDYVBmkgyCpZVaMRlJ2k3SlygIfQpK6sGniiDCInrrIQgkLQTNqHlIwjBRFKUL1KRFk9aUl2nsnLk6F2fmXDudiSAqK9ovm7X/f3//WptN4D8XsVxxpnPPcR4Z5sLmvsv/DJi9UXPRbNt8RhQSYJyTl4pbBs/+NcDTvmujvqj0ucVmAlga9Ks4fO/pspITD1/8EeDtqtMQlMlprVpfTHtDIEgDrMZ5uEYiLoHjN5S09KeWB1yvarDa6+7NL7rRMVCORIpF60EGFtaLycfexk2tg47fAnw9tUYya1U0q7JQ0YdPBeB2v8PT3rWKnhqeRTIumEqPOWK/BPi7ajr1lQeadCv8irbZRxGJRjE/UKDo6AKBiRHPze3nxpt/AgS6a9doC7Z8IPNJqHmncpZn90DgBTC9EUVzqQy8HmEw8zZY0HAHH38EdO4cN2yzVXGRZzAaeOUsp1oEL3AI3U+3LYUJiHEOQw/mRus74vbvAH+btlFdVn2XKtKADwVhtKjS9gpppUN6Qil6cUGAWZ+BKWcAE85A46GepEMBBK+tpnX1+3JF30uIohoadXpi160JGaDC0b0r0w5iHIikCL1ahf6+2cj+9lgmEbygPqne23RVZfoMaSkJUeCho0REGTd2ny9HLBLGWNskjOZ8JCJyNFaEjgTouRj6h+nTRLS7nCV3VFAi/UaeQcoOOBiNcu4pF7KPrAMScQQdXliy8xAJSZBSIghWjkJJGBpjQERvV0hU3VZIvmk5rGxdZKHVfs3FwDXNKNaLi3KVnQ3Ll78BSJWEwUefQISuZDXDmtMuZRoSklwQefnleUmOwSLsl/+LpILGQCAWoyBwck3ukSQJPiah89DJli+GLi5mbglqgwAAAABJRU5ErkJggg==);
+}
+
+.icon-information
+{
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAADc0lEQVR42l2Ta2hbZRjH/+85OSeJp0mT1GTN0qUim810WDadbpWBgyatMEYn88ZmSzuqs25U2AcR/TAGwph4qZNOMuxUnH4pa52D2XWgwwmbXdt1sRVbakRN2+S0uTWn536OZ6lM5wMPvDy8/Pg/lz/B/6NudzNca1sqQ449lR4vd7tUyOeEQkoawPLcIH49/+1/v5M7r/pWFrpyYWf3M9GGhs24LxiCWmSg0QSmKWD2ryR+uPELxuPnhkGzuzDxufIv4NGDDAw9daz/Df+T1TXou8bj50wBz2/wYZwX8Lug40RsAwRaRv/ELOKvfsCDokO48bG6Cnh4/6V3B49HfZQTX40tIi2b+LKpFg96HZjKSTjyYwrzRQXPbfShcZMf/YlZnGg/NoxbX8QI6ttiHW+2D4U31eG7yQJUisaSrONsYxiP+J0Y5UV0X52DYZjwMhRYBji4Yx16zl7ExVPnmgjZdiR+qPe1zvmcBs4A3HYayYKKGStzKytYWpFQX7MGT4U58CuKlSocLIuI38TRl3tOk9rW4+nmrn0BIhOM8BISWRm1bjve21qFB7xOTOdEq4U/MW3Vg3YTT9cFoVCAUVWFy+98mCGhrh4xunev41pGxEI2D7EkWHI1XG/bis3VLowvLGN//01MLRRxb9ALBTSejaxFIBTEZz29Etn4+qdics39DkZT4KaBrGhANHSMdT5RBoymS3hhIIGZhTxqA5XICiIU3UB3SyO+6TsjkZpXTqWlhyIBSjHLvWWWJcjWwEY7Hl8FZG4DJjEzl0c4UAFFlSFICqojEYiXhzLEse/9uC+2o9MoirCZJhZLClRLwciB7WXAWEYoA6bnlhD2uyFrGmzWKhRrG8tXfjpNuN1vx1yN24dojgMRJPAlFYZp4HrHtjJgwjqkF7+eROIPCxBwWQAdNo8PajYF4cpYU/mQuPaPLvl2NkQpUcV8OguHncH3rY+VAbcWBbSdn8TNJI91lgKDqwAh1oqvjgwLZw7FVgEdJxnK4055t9T7FWuIS4s83opugcdhR16ScXRoHL5KN5z3OK3jV1BITPFGvhgS+g6rd8zk7IqzNsZ2oWL9+ihlKSiZLEqMB6yhwqXlwRIDmgUTfksOa6q2S+x9Sbnbjf8Ed/iTZpvP00Lb6D2EYct2NlVF0DV9QMvmB4WTB+6y89/rZI8dnqV10wAAAABJRU5ErkJggg==);
+}
+
+.icon-trace
+{
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYxIDY0LjE0MDk0OSwgMjAxMC8xMi8wNy0xMDo1NzowMSAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNS4xIFdpbmRvd3MiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6RUQ1OTY5ODk1OEZBMTFFMkI4QUNDNDhBQzNEOEUwODIiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6RUQ1OTY5OEE1OEZBMTFFMkI4QUNDNDhBQzNEOEUwODIiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDpFRDU5Njk4NzU4RkExMUUyQjhBQ0M0OEFDM0Q4RTA4MiIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDpFRDU5Njk4ODU4RkExMUUyQjhBQ0M0OEFDM0Q4RTA4MiIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/Pne6fXUAAAH5SURBVHjajFJNTxNRFD3vTWfYmFBF28QYNjb+Atw0Gv+BFFkIxLULN6z9LYWdqR+dTltDQiCyYGNZqawgIQpSA2lKQMpMMLUz1/vezMiM9etO7nt37rx37plzryAivF5aOhn4fpZDqHdeEZraBaQQEEJ0H5RKOcRfiC6CWqNB/7JOp0O241SSAMolEvU+XRX43D1B++AQ++0v2N3b1/lnlQpyuRzuFIuzdr3+HAlLARiPJ2FZI1hZXsb29hYsM6PzQkp0u0fI5/O4WyzOOI2GHQNkkEDwF5oQTyXul6ZA/gC+H+j8rUIBq2tvQEGAR3Nzivp0GiBCuNT2IfrfuCRxVSWchOt5uD0xoT22IBbwAkDo1b1hINse8P1AuzrY73/Hcf+USxACZnBt7IpSMK1BdB8jT6aRMQ3Y1Zf48P4dNtkt00T11YswNgwMmWpFtR62cWcM1BsQuefnxNTpzHWpx37mhftpr6fPVWs1ituY0uD6ESeDiJAIaQk1RPoEP1IOEUhpcMBzMM4gwrRYKT8clAgoiCr+aikNRucfasRyuYxWqwWTgRYWF9Ha2OD3tzCMzO81sKNR3rmMv44zdyHUwHEoNcoRARSOhykmTUS/IxNaaE6e6647zea9GBVEf0LQmniet/4zpS4w8k2Os/h/+8r3PqrghwADAClPWgiNkq1IAAAAAElFTkSuQmCC);
+}
+
+.time
+{
+	display: table-cell;
+	padding: 6px 6px 0 0;
+	color: #999;
+	vertical-align: top;
+}
+
+.spacer
+{
+	display: table-cell;
+	width: 0;
+	height: 16px;
+	text-indent: -10000px;
+}
+
+.message
+{
+	display: table-cell;
+	padding: 6px 0.5em 6px 0;
+	vertical-align: top;
+}
+
+.modal-overlay
+{
+	display: none;
+	position: fixed;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	background-color: #666;
+	filter: alpha(opacity=50);
+	z-index: 1000;
+}
+
+.modal-box
+{
+	position: relative;
+	margin: 60px auto 0 auto;
+	width: 520px;
+	max-height: 460px;
+	overflow: auto;
+	background-color: Window;
+	color: WindowText;
+	border: 1px solid #999;
+	border-radius: 6px;
+	box-shadow: 0 0 20px 2px rgba(0, 0, 0, 0.5);
+	padding: 1em;
+}
+
+.modal-box h2
+{
+	margin: 0 0 0.5em 0;
+	font-size: 15px;
+}
+
+.attr-row
+{
+	margin-bottom: 0.4em;
+	white-space: nowrap;
+}
+
+.attr-row select
+{
+	width: 230px;
+}
+
+.attr-row input[type="text"]
+{
+	width: 170px;
+}
+
+.modal-actions
+{
+	margin-top: 0.5em;
+}
+</style>
+
+<script type="text/javascript">
+// <![CDATA[
+// サービス名の既定値（未保存時のみ使用。入力値は設定ファイルに保存される）
+var DefaultServiceName = 'AmiVoiceRealTimeRecorder';
+
+// ChannelSwitcher.exe（チャンネル振り分け・音声再生ツール）の相対パス
+// 既定ではこの HTA と同じフォルダに channel-switcher\dist\ChannelSwitcher.exe が配置されている前提
+var ChannelSwitcherRelativePath = 'channel-switcher\\dist\\ChannelSwitcher.exe';
+
+// このスクリプトが置かれているフォルダを取得する
+var ScriptDir = (function() {
+	try {
+		var path = unescape(location.pathname);
+		if (path.charAt(0) === '/') {
+			path = path.substring(1);
+		}
+		path = path.replace(/\//g, '\\');
+
+		var fso = new ActiveXObject('Scripting.FileSystemObject');
+		return fso.GetParentFolderName(path);
+	} catch (e) {
+		return '';
+	}
+})();
+
+// 設定ファイル（サービス名）の保存先
+var SettingsPath = (function() {
+	try {
+		var shell = new ActiveXObject('WScript.Shell');
+		var appData = shell.ExpandEnvironmentStrings('%APPDATA%');
+		return appData + '\\RRLinkSample\\settings.txt';
+	} catch (e) {
+		return '';
+	}
+})();
+
+// 通話属性識別子の一覧（識別子, 表示名）
+var ConversationAttributeKeys = [
+	['amivoice.common.description', '備考'],
+	['amivoice.common.direction', '向き'],
+	['amivoice.common.linetype', '通話回線種別'],
+	['amivoice.common.mark', 'マーク'],
+	['amivoice.common.operator.key', '自分の識別名'],
+	['amivoice.common.operator.name', '自分の名称'],
+	['amivoice.common.operator.phonenumber', '自番号'],
+	['amivoice.common.operator.group', '自分の所属グループ'],
+	['amivoice.common.operator.hostname', '自分のホスト名'],
+	['amivoice.common.customer.key', '相手の識別名'],
+	['amivoice.common.customer.name', '相手の名称'],
+	['amivoice.common.customer.phonenumber', '相手番号'],
+	['amivoice.common.customer.gender', '相手の性別'],
+	['amivoice.common.telephony.dialin.phonenumber', 'ダイヤルイン番号'],
+	['amivoice.common.telephony.distributing.phonenumber', '受電グループ番号'],
+	['amivoice.common.telephony.called.phonenumber', '掛先番号'],
+	['amivoice.common.telephony.alerting.phonenumber', '呼出先番号'],
+	['amivoice.common.telephony.trunk.group', 'トランクグループ'],
+	['amivoice.common.telephony.trunk.member', 'トランクメンバ'],
+	['amivoice.common.telephony.ivr.duration', 'IVR 応対時間'],
+	['amivoice.common.telephony.queue.phonenumber', '通話キュー番号'],
+	['amivoice.common.telephony.queue.duration', '待ち時間'],
+	['amivoice.common.telephony.transfer.source.key', '転送元識別名'],
+	['amivoice.common.telephony.transfer.source.name', '転送元名称'],
+	['amivoice.common.telephony.transfer.source.phonenumber', '転送元番号'],
+	['amivoice.common.telephony.transfer.destination.key', '転送先識別名'],
+	['amivoice.common.telephony.transfer.destination.name', '転送先名称'],
+	['amivoice.common.telephony.transfer.destination.phonenumber', '転送先番号'],
+	['amivoice.common.reference.global.id', 'グローバル参照用のID'],
+	['amivoice.common.reference.global.url', 'グローバル参照用のURL'],
+	['amivoice.common.reference.local.id', 'ローカル参照用のID'],
+	['amivoice.common.reference.local.url', 'ローカル参照用のURL'],
+	['amivoice.common.reference.site.id', 'サイト参照用のID'],
+	['amivoice.common.reference.site.url', 'サイト参照用のURL'],
+	['amivoice.common.reference.private.id', 'プライベート参照用のID'],
+	['amivoice.common.reference.private.url', 'プライベート参照用のURL']
+];
+
+
+var RRLinkClient = (function() {
+	var RRLinkClientClassId          = '7C35DB0F-0B50-4124-B8F6-EA957CF2CCEF';
+	var ActiveXHostingPluginMimeType = 'application/x-itst-activex';
+
+	// ログの出力先（任意）
+	var LogPath                      = '';
+
+	// コネクションタイムアウト時間（必須: ミリ秒）
+	var WaitForConnectionTimeout     = 3000;
+
+	// 自動録音の有無（必須）
+	var AutoControlEnabled           = false;
+
+	// 会話識別名（必須）
+	var ConversationKey              = '';
+
+	var linkClient;
+	var channelController;
+	var errorHandlerRegistered = false;
+
+	var MessageType = {
+		Error: 'Error',
+		Warn: 'Warning',
+		Info: 'Information',
+		Trace: 'Trace'
+	}
+
+
+	var FormatNumber = function(value, scale) {
+		/// <summary>
+		/// 指定した値を指定した桁数の揃えた文字列を返します。
+		/// </summary>
+		/// <param name="value" type="Number" integer="true">値。</param>
+		/// <param name="scale" type="Number" integer="true">桁数。</param>
+		/// <returns type="String">値を指定した桁数に揃えた文字列。</returns>
+
+		value = value + '';
+		for (var i = scale - value.length; i > 0; i--) {
+			value = '0' + value;
+		}
+
+		return value;
+	};
+
+
+	var TraceLog = function(type, message, e) {
+		/// <summary>
+		/// 指定したメッセージを画面に出力します。
+		/// </summary>
+		/// <param name="type" type="String">メッセージの種類。</param>
+		/// <param name="message" type="String">メッセージ。</param>
+		/// <param name="e" type="Error" mayBeNull="true">例外。</param>
+
+		// 警告とエラー以外は出力しない
+		// （ChannelSwitcher.exe 起動時に仮想オーディオデバイス未設定などで生じる
+		//  Trace/Info メッセージは、ここで自然に非表示になる）
+		if (type !== MessageType.Warn && type !== MessageType.Error) {
+			return;
+		}
+
+		var output = document.getElementById('RRLinkClientOutput');
+		output.style.display = 'block';
+		var date = new Date();
+
+		var iconElement = document.createElement('span');
+		iconElement.setAttribute('class', 'icon icon-' + type.toLowerCase());
+		iconElement.appendChild(document.createTextNode(type[0] + ': '));
+
+		var timeElement = document.createElement('span');
+		timeElement.setAttribute('class', 'time');
+		timeElement.appendChild(document.createTextNode(FormatNumber(date.getHours(), 2) + ':' + FormatNumber(date.getMinutes(), 2) + ':' + FormatNumber(date.getSeconds(), 2) + '.' + FormatNumber(date.getMilliseconds(), 3)));
+
+		var spacerElement = document.createElement('span');
+		spacerElement.setAttribute('class', 'spacer');
+		spacerElement.appendChild(document.createTextNode(' '));
+
+		var messageElement = document.createElement('span');
+		messageElement.setAttribute('class', 'message');
+
+		message = message + '';
+		if (e) {
+			message = message + e;
+			if (e.stack != undefined) {
+				message = message + '\n' + e.stack;
+			} else if (e.fileName !== undefined && e.lineNumber !== undefined) {
+				message = message + '\n' + e.fileName + ' (' + e.lineNumber + ')';
+			}
+		}
+
+		var lines = message.replace(/([\s]*[\r]?\n)+$/, '').split(/[\r]?\n/);
+		for (var i = 0; i < lines.length; i++) {
+			messageElement.appendChild(document.createTextNode(lines[i]));
+			messageElement.appendChild(document.createElement('br'));
+		}
+
+		var logElement = document.createElement('div');
+		logElement.setAttribute('class', 'log log-' + type.toLowerCase());
+		logElement.appendChild(iconElement);
+		logElement.appendChild(timeElement);
+		logElement.appendChild(spacerElement);
+		logElement.appendChild(messageElement);
+
+		output.appendChild(logElement);
+		output.scrollTop = output.scrollHeight;
+	};
+
+
+	var IsPreparedLinkClient = function() {
+		/// <summary>
+		/// RealTimeRecorderLinkClient が準備できているかどうかを取得します。
+		/// </summary>
+		/// <returns type="Boolean">準備できている場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+		return linkClient && typeof(linkClient.Status) !== 'undefined';
+	};
+
+
+	var IsPreparedChannelController = function() {
+		/// <summary>
+		/// IRealTimeRecorderLinkChannelController が準備できているかどうかを取得します。
+		/// </summary>
+		/// <returns type="Boolean">準備できている場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+		return channelController != null;
+	};
+
+
+	var Handlers = {
+		AxHostLogger: function(message) {
+			TraceLog(MessageType.Trace, '#AxHost: ' + message);
+		},
+
+		OnError: function(message) {
+			TraceLog(MessageType.Error, '#OnError: ' + message);
+		},
+
+		OnStatusChanged: function(status) {
+			TraceLog(MessageType.Trace, '#OnStatusChanged: ' + status);
+		}
+	};
+
+
+	return {
+		Create: function() {
+			/// <summary>
+			/// RealTimeRecorderLinkClient を作成します。
+			/// </summary>
+			/// <returns type="Boolean">作成が完了した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'Create が呼び出されました。');
+			try {
+				// すでに作成済みの場合は削除
+				if (linkClient) {
+					// 正しく作成されていた場合のみ破棄するメッセージを表示
+					if (IsPreparedLinkClient()) {
+						TraceLog(MessageType.Warn, '作成済みの RealTimeRecorderLinkClient を破棄します。');
+					}
+
+					document.body.removeChild(linkClient);
+					linkClient = null;
+					channelController = null;
+					errorHandlerRegistered = false;
+				}
+
+				TraceLog(MessageType.Info, 'RealTimeRecorderLinkClient を作成します。');
+
+				// IE 用に RealTimeRecorderLinkClient のインスタンスを作成
+				var client = document.createElement('object');
+				client.style.width  = 0;
+				client.style.height = 0;
+				client.setAttribute('classid', 'CLSID:' + RRLinkClientClassId);
+				document.body.appendChild(client);
+
+				// IE でロードできた場合は Status プロパティのタイプが 'unknown' になる
+				if (typeof(client.Status) !== 'undefined') {
+					linkClient = client;
+					TraceLog(MessageType.Info, 'IE 用のコードで RealTimeRecorderLinkClient を作成しました。');
+					return true;
+				}
+
+				// 作成できていないのでオブジェクトを削除
+				document.body.removeChild(client);
+
+				// ActiveX hosting plugin for Firefox が使用できない場合
+				if (!navigator.mimeTypes[ActiveXHostingPluginMimeType]) {
+					TraceLog(MessageType.Error, 'IE 用のコードで RealTimeRecorderLinkClient が作成できませんでした。また、ActiveX hosting plugin for Firefox がインストールされていないか無効になっています。\nIE 以外のブラウザでは ActiveX hosting plugin for Firefox (http://code.google.com/p/ff-activex-host/) をインストールする必要があります。');
+					return;
+				}
+
+				// イベントハンドラを準備
+				for (var name in Handlers) {
+					window['RRLinkClient_' + name] = Handlers[name];
+				}
+
+				// ActiveX hosting plugin for Firefox (Chorme も可) を使用してインスタンスを作成
+				TraceLog(MessageType.Info, 'IE 用のコードで RealTimeRecorderLinkClient が作成できなかったため ActiveX hosting plugin for Firefox を使用して作成します。');
+				client = document.createElement('object');
+				client.setAttribute('class' , 'object object-firefox');
+				client.setAttribute('type'  , ActiveXHostingPluginMimeType);
+				client.setAttribute('clsid' , '{' + RRLinkClientClassId + '}');
+				client.setAttribute('width' , 0);
+				client.setAttribute('height', 0);
+				// MEMO: Chrome の場合 logger が指定してあると終了時にクラッシュする
+				client.setAttribute('logger'    , 'RRLinkClient_AxHostLogger');
+				client.setAttribute('debugLevel', '100');
+				client.setAttribute('event_OnError'        , 'RRLinkClient_OnError');
+				client.setAttribute('event_OnStatusChanged', 'RRLinkClient_OnStatusChanged');
+				document.body.appendChild(client);
+
+				if (typeof(client.Status) === 'undefined') {
+					// ユーザが操作でプラグインの実行を許可出来るようにオブジェクトを画面に表示したままにしておく
+					linkClient = client;
+					TraceLog(MessageType.Error, 'ActiveX hosting plugin for Firefox を使用して RealTimeRecorderLinkClient を作成しましたが、プラグインの実行が許可されていません。\nActiveX hosting plugin for Firefox の実行を許可してください。');
+					return false;
+				}
+
+				linkClient = client;
+
+				// ActiveX hosting plugin for Firefox ではイベントハンドラが登録済み
+				errorHandlerRegistered = true;
+				TraceLog(MessageType.Info, 'ActiveX hosting plugin for Firefox を使用して RealTimeRecorderLinkClient を作成しました。');
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'Create でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'Create が終了しました。');
+			}
+		},
+
+
+		Release: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkClient の参照を破棄します。
+			/// </summary>
+			/// <returns type="Boolean">破棄が成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'Release が呼び出されました。');
+			try {
+				if (!IsPreparedLinkClient()) {
+					TraceLog(MessageType.Warn, 'RealTimeRecorderLinkClient が作成されていません。');
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'インスタンスの参照を破棄します。');
+				linkClient = null;
+				channelController = null;
+
+				TraceLog(MessageType.Info, 'インスタンスの参照を破棄しました。');
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'Release でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'Release が終了しました。');
+			}
+		},
+
+
+		Initialize: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkClient.Initialize を呼び出します。
+			/// </summary>
+			/// <returns type="Boolean">呼び出しが成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'Initialize が呼び出されました。');
+			try {
+				if (!IsPreparedLinkClient()) {
+					TraceLog(MessageType.Warn, 'RealTimeRecorderLinkClient が作成されていません。');
+					return false;
+				}
+
+				// IE 用にイベントハンドラを登録
+				if (!errorHandlerRegistered) {
+					linkClient.OnError         = Handlers.OnError;
+					linkClient.OnStatusChanged = Handlers.OnStatusChanged;
+
+					errorHandlerRegistered = true;
+				}
+
+				// サービス名はテキストボックスから取得する（画面表示時に設定ファイルの値が入っている）
+				var serviceName = document.getElementById('RRLinkClientServiceName').value;
+				if (!serviceName) {
+					serviceName = DefaultServiceName;
+				}
+				var logPath = LogPath;
+				TraceLog(MessageType.Info, 'サービス名 "' + serviceName + '", ログファイルパス "' + logPath + '" として呼び出します。');
+
+				var result = linkClient.Initialize(serviceName, logPath);
+				if (result != 0) {
+					TraceLog(MessageType.Error, 'Initialize の呼び出しが失敗しました。戻り値: ' + result);
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'Initialize の呼び出しが成功しました。');
+
+				var version = linkClient.Version;
+				TraceLog(MessageType.Info, 'API のバージョンは ' + version + 'です。');
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'Initialize でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'Initialize が終了しました。');
+			}
+		},
+
+
+		Terminate: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkClient.Terminate を呼び出します。
+			/// </summary>
+			/// <returns type="Boolean">呼び出しが成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'Terminate が呼び出されました。');
+			try {
+				if (!IsPreparedLinkClient()) {
+					TraceLog(MessageType.Warn, 'RealTimeRecorderLinkClient が作成されていません。');
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'インスタンスを破棄します。');
+				linkClient.Terminate();
+
+				TraceLog(MessageType.Info, 'Terminate の呼び出しが成功しました。');
+
+				channelController = null;
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'Terminate でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'Terminate が終了しました。');
+			}
+		},
+
+
+		WaitForConnection: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkClient.WaitForConnection を呼び出します。
+			/// </summary>
+			/// <returns type="Boolean">呼び出しが成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'WaitForConnection が呼び出されました。');
+			try {
+				if (!IsPreparedLinkClient()) {
+					TraceLog(MessageType.Warn, 'RealTimeRecorderLinkClient が作成されていません。');
+					return false;
+				}
+
+				var millisecondsTimeout = WaitForConnectionTimeout;
+				if (!/^(-1|[0-9]{1,10})$/.test(millisecondsTimeout)) {
+					TraceLog(MessageType.Error, '指定されたタイムアウトの値 "' + millisecondsTimeout + '" は正しい数値ではありません。');
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'タイムアウト "' + millisecondsTimeout + '" ミリ秒を指定して呼び出します。');
+
+				// 数値に変換
+				millisecondsTimeout = millisecondsTimeout - 0;
+				var result = linkClient.WaitForConnection(millisecondsTimeout);
+				if (result != 0) {
+					TraceLog(MessageType.Error, 'WaitForConnection の呼び出しが失敗しました。戻り値: ' + result);
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'WaitForConnection の呼び出しが成功しました。');
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'WaitForConnection でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'WaitForConnection が終了しました。');
+			}
+		},
+
+
+		GetChannelController: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkClient.GetChannelController を呼び出します。
+			/// </summary>
+			/// <returns type="Boolean">呼び出しが成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'GetChannelController が呼び出されました。');
+			try {
+				if (!IsPreparedLinkClient()) {
+					TraceLog(MessageType.Warn, 'RealTimeRecorderLinkClient が作成されていません。');
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'チャンネルコントローラを取得します。');
+				var controller = linkClient.GetChannelController();
+				if (!controller) {
+					TraceLog(MessageType.Error, 'GetChannelController() が null を返しました。');
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'GetChannelController の呼び出しが成功しました。');
+				channelController = controller;
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'GetChannelController でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'GetChannelController が終了しました。');
+			}
+		},
+
+
+		SetAutoControl: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkChannelController.SetAutoControl を呼び出します。
+			/// </summary>
+			/// <returns type="Boolean">呼び出しが成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'SetAutoControl が呼び出されました。');
+			try {
+				if (!IsPreparedChannelController()) {
+					TraceLog(MessageType.Warn, 'チャンネルコントローラが取得されていません。');
+					return false;
+				}
+
+				// 固定で「自動録音しない」に設定
+				var enabled = AutoControlEnabled;
+				TraceLog(MessageType.Info, '自動登録の設定を "' + enabled + '" に変更します。');
+
+				var result = channelController.SetAutoControl(enabled);
+				if (result != 0) {
+					TraceLog(MessageType.Error, 'SetAutoControl の呼び出しが失敗しました。戻り値: ' + result);
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'SetAutoControl の呼び出しが成功しました。');
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'SetAutoControl でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'SetAutoControl が終了しました。');
+			}
+		},
+
+
+		StartRecording: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkChannelController.StartRecording を呼び出します。
+			/// </summary>
+			/// <returns type="Boolean">呼び出しが成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'StartRecording が呼び出されました。');
+			try {
+				if (!IsPreparedChannelController()) {
+					TraceLog(MessageType.Warn, 'チャンネルコントローラが取得されていません。');
+					return false;
+				}
+
+				var conversationKey = ConversationKey;
+				if (conversationKey != null && conversationKey.length) {
+					TraceLog(MessageType.Info, '通話識別子を "' + conversationKey + '" として録音を開始します。');
+				} else {
+					TraceLog(MessageType.Info, '通話識別子を指定せずに録音を開始します。');
+				}
+
+				var result = channelController.StartRecording(conversationKey);
+				if (result != 0) {
+					TraceLog(MessageType.Error, 'StartRecording の呼び出しが失敗しました。戻り値: ' + result);
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'StartRecording の呼び出しが成功しました。');
+				document.getElementById('RRLinkClientStartRecordingButton').setAttribute('disabled', 'disabled');
+				document.getElementById('RRLinkClientStopRecordingButton' ).removeAttribute('disabled');
+				document.getElementById('RRLinkClientPauseRecordingButton').removeAttribute('disabled');
+				document.getElementById('RRLinkClientResumeRecordingButton').setAttribute('disabled', 'disabled');
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'StartRecording でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'StartRecording が終了しました。');
+			}
+		},
+
+
+		SetConversationAttributes: function(pairs) {
+			/// <summary>
+			/// 複数の通話属性をまとめて IRealTimeRecorderLinkChannelController.SetConversationAttribute で設定します。
+			/// </summary>
+			/// <param name="pairs" type="Array">{key, value} の配列。value が null の場合は該当属性を削除します。</param>
+			/// <returns type="Boolean">すべて成功した場合は <c>true</c>。1件でも失敗した場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'SetConversationAttributes が呼び出されました。');
+			try {
+				if (!IsPreparedChannelController()) {
+					TraceLog(MessageType.Warn, 'チャンネルコントローラが取得されていません。');
+					return false;
+				}
+
+				var succeeded = true;
+				for (var i = 0; i < pairs.length; i++) {
+					var key = pairs[i].key;
+					var value = pairs[i].value;
+
+					if (value != null) {
+						TraceLog(MessageType.Info, '通話属性識別子 "' + key + '"、通話属性値 "' + value + '" を設定します。');
+					} else {
+						TraceLog(MessageType.Info, '通話属性識別子 "' + key + '" に対応する設定済の通話属性を削除します。');
+					}
+
+					var result = channelController.SetConversationAttribute(key, value);
+					if (result != 0) {
+						TraceLog(MessageType.Error, 'SetConversationAttribute の呼び出しが失敗しました。通話属性識別子: "' + key + '"、戻り値: ' + result);
+						succeeded = false;
+					}
+				}
+
+				return succeeded;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'SetConversationAttributes でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'SetConversationAttributes が終了しました。');
+			}
+		},
+
+
+		FlushConversationAttributes: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkChannelController.FlushConversationAttributes を呼び出します。
+			/// </summary>
+			/// <returns type="Boolean">呼び出しが成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'FlushConversationAttributes が呼び出されました。');
+			try {
+				if (!IsPreparedChannelController()) {
+					TraceLog(MessageType.Warn, 'チャンネルコントローラが取得されていません。');
+					return false;
+				}
+
+				TraceLog(MessageType.Info, '通話属性を確定します。');
+				var result = channelController.FlushConversationAttributes();
+				if (result != 0) {
+					TraceLog(MessageType.Error, 'FlushConversationAttributes の呼び出しが失敗しました。戻り値: ' + result);
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'FlushConversationAttributes の呼び出しが成功しました。');
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'FlushConversationAttributes でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'FlushConversationAttributes が終了しました。');
+			}
+		},
+
+
+		PauseRecording: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkChannelController.PauseRecording を呼び出します。
+			/// </summary>
+			/// <returns type="Boolean">呼び出しが成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'PauseRecording が呼び出されました。');
+			try {
+				if (!IsPreparedChannelController()) {
+					TraceLog(MessageType.Warn, 'チャンネルコントローラが取得されていません。');
+					return false;
+				}
+
+				TraceLog(MessageType.Info, '録音を一時停止します。');
+				var result = channelController.PauseRecording();
+				if (result != 0) {
+					TraceLog(MessageType.Error, 'PauseRecording の呼び出しが失敗しました。戻り値: ' + result);
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'PauseRecording の呼び出しが成功しました。');
+				document.getElementById('RRLinkClientPauseRecordingButton').setAttribute('disabled', 'disabled');
+				document.getElementById('RRLinkClientResumeRecordingButton').removeAttribute('disabled');
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'PauseRecording でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'PauseRecording が終了しました。');
+			}
+		},
+
+
+		ResumeRecording: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkChannelController.ResumeRecording を呼び出します。
+			/// </summary>
+			/// <returns type="Boolean">呼び出しが成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'ResumeRecording が呼び出されました。');
+			try {
+				if (!IsPreparedChannelController()) {
+					TraceLog(MessageType.Warn, 'チャンネルコントローラが取得されていません。');
+					return false;
+				}
+
+				TraceLog(MessageType.Info, '録音を再開します。');
+				var result = channelController.ResumeRecording();
+				if (result != 0) {
+					TraceLog(MessageType.Error, 'ResumeRecording の呼び出しが失敗しました。戻り値: ' + result);
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'ResumeRecording の呼び出しが成功しました。');
+				document.getElementById('RRLinkClientPauseRecordingButton').removeAttribute('disabled');
+				document.getElementById('RRLinkClientResumeRecordingButton').setAttribute('disabled', 'disabled');
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'ResumeRecording でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'ResumeRecording が終了しました。');
+			}
+		},
+
+
+		StopRecording: function() {
+			/// <summary>
+			/// IRealTimeRecorderLinkChannelController.StopRecording を呼び出します。
+			/// </summary>
+			/// <returns type="Boolean">呼び出しが成功した場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'StopRecording が呼び出されました。');
+			try {
+				if (!IsPreparedChannelController()) {
+					TraceLog(MessageType.Warn, 'チャンネルコントローラが取得されていません。');
+					return false;
+				}
+
+				TraceLog(MessageType.Info, '録音を停止します。');
+				var result = channelController.StopRecording();
+				if (result != 0) {
+					TraceLog(MessageType.Error, 'StopRecording の呼び出しが失敗しました。戻り値: ' + result);
+					return false;
+				}
+
+				TraceLog(MessageType.Info, 'StopRecording の呼び出しが成功しました。');
+				document.getElementById('RRLinkClientStartRecordingButton').removeAttribute('disabled');
+				document.getElementById('RRLinkClientStopRecordingButton' ).setAttribute('disabled', 'disabled');
+				document.getElementById('RRLinkClientPauseRecordingButton').setAttribute('disabled', 'disabled');
+				document.getElementById('RRLinkClientResumeRecordingButton').setAttribute('disabled', 'disabled');
+				return true;
+			} catch (e) {
+				TraceLog(MessageType.Error, 'StopRecording でエラーが発生しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'StopRecording が終了しました。');
+			}
+		},
+
+
+		LaunchChannelSwitcher: function() {
+			/// <summary>
+			/// チャンネル振り分け・音声再生ツール（ChannelSwitcher.exe）を別プロセスとして起動します。
+			/// 仮想オーディオデバイスが未設定などの理由で起動に失敗しても、ここでは画面には表示しません。
+			/// </summary>
+			/// <returns type="Boolean">起動できた場合は <c>true</c>。それ以外の場合は <c>false</c>。</returns>
+
+			TraceLog(MessageType.Info, 'LaunchChannelSwitcher が呼び出されました。');
+			try {
+				var fso = new ActiveXObject('Scripting.FileSystemObject');
+				var exePath = fso.BuildPath(ScriptDir, ChannelSwitcherRelativePath);
+				if (!fso.FileExists(exePath)) {
+					// 仮想オーディオデバイス／ChannelSwitcher.exe が未配置な環境向けに、
+					// ここでは Trace として記録するだけで画面には表示しない
+					TraceLog(MessageType.Trace, 'ChannelSwitcher.exe が見つかりません: ' + exePath);
+					return false;
+				}
+
+				var shell = new ActiveXObject('WScript.Shell');
+				shell.Run('"' + exePath + '"', 1, false);
+				TraceLog(MessageType.Info, 'ChannelSwitcher.exe を起動しました: ' + exePath);
+				return true;
+			} catch (e) {
+				// 同上の理由でここでも画面には表示しない
+				TraceLog(MessageType.Trace, 'ChannelSwitcher.exe の起動に失敗しました。', e);
+				return false;
+			} finally {
+				TraceLog(MessageType.Info, 'LaunchChannelSwitcher が終了しました。');
+			}
+		}
+	};
+})();
+
+
+// ---------- サービス名の保存・読み込み ----------
+
+function LoadSettings() {
+	var serviceName = DefaultServiceName;
+	try {
+		if (SettingsPath) {
+			var fso = new ActiveXObject('Scripting.FileSystemObject');
+			if (fso.FileExists(SettingsPath)) {
+				var ts = fso.OpenTextFile(SettingsPath, 1);
+				var content = ts.ReadAll();
+				ts.Close();
+
+				var lines = content.split(/\r?\n/);
+				for (var i = 0; i < lines.length; i++) {
+					var eq = lines[i].indexOf('=');
+					if (eq < 0) continue;
+					var key = lines[i].substring(0, eq);
+					var val = lines[i].substring(eq + 1);
+					if (key === 'serviceName' && val.length) {
+						serviceName = val;
+					}
+				}
+			}
+		}
+	} catch (e) {
+		// 設定ファイルが読めない場合は既定値をそのまま使う
+	}
+	document.getElementById('RRLinkClientServiceName').value = serviceName;
+}
+
+function SaveSettings() {
+	try {
+		if (!SettingsPath) return;
+		var fso = new ActiveXObject('Scripting.FileSystemObject');
+		var folder = fso.GetParentFolderName(SettingsPath);
+		if (folder && !fso.FolderExists(folder)) {
+			fso.CreateFolder(folder);
+		}
+		var ts = fso.CreateTextFile(SettingsPath, true);
+		ts.WriteLine('serviceName=' + document.getElementById('RRLinkClientServiceName').value);
+		ts.Close();
+	} catch (e) {
+		// 保存に失敗しても致命的ではないため、ここでは何もしない
+	}
+}
+
+
+// ---------- 接続（Create〜SetAutoControl）----------
+
+function Connect() {
+	/// <summary>
+	/// Create〜SetAutoControl をまとめて実行します。
+	/// </summary>
+
+	if (!RRLinkClient.Create()) {
+		return;
+	}
+
+	if (!RRLinkClient.Initialize()) {
+		return;
+	}
+
+	if (!RRLinkClient.WaitForConnection()) {
+		return;
+	}
+
+	if (!RRLinkClient.GetChannelController()) {
+		return;
+	}
+
+	if (!RRLinkClient.SetAutoControl()) {
+		return;
+	}
+
+	// 全ての初期処理が成功したら操作パネルを有効化
+	document.getElementById('RRLinkClientStartRecordingButton').removeAttribute('disabled');
+}
+
+function Reconnect() {
+	/// <summary>
+	/// サービス名を変更した場合などに、いったん切断してから接続をやり直します。
+	/// </summary>
+
+	SaveSettings();
+	RRLinkClient.Terminate();
+	RRLinkClient.Release();
+	Connect();
+}
+
+
+// ---------- 通話属性をまとめて設定するパネル ----------
+
+function CreateAttributeRow() {
+	var row = document.createElement('div');
+	row.className = 'attr-row';
+
+	var select = document.createElement('select');
+	select.className = 'select';
+
+	var blank = document.createElement('option');
+	blank.value = '';
+	blank.text = '';
+	select.appendChild(blank);
+
+	for (var i = 0; i < ConversationAttributeKeys.length; i++) {
+		var opt = document.createElement('option');
+		opt.value = ConversationAttributeKeys[i][0];
+		opt.text = ConversationAttributeKeys[i][1];
+		select.appendChild(opt);
+	}
+	row.appendChild(select);
+
+	var input = document.createElement('input');
+	input.type = 'text';
+	input.className = 'textbox';
+	input.maxLength = 256;
+	row.appendChild(input);
+
+	var removeButton = document.createElement('input');
+	removeButton.type = 'button';
+	removeButton.className = 'button';
+	removeButton.value = '削除';
+	removeButton.onclick = function() {
+		row.parentNode.removeChild(row);
+	};
+	row.appendChild(removeButton);
+
+	return row;
+}
+
+function AddAttributeRow() {
+	document.getElementById('RRLinkClientAttributesRows').appendChild(CreateAttributeRow());
+}
+
+function OpenAttributesPanel() {
+	var container = document.getElementById('RRLinkClientAttributesRows');
+	if (container.childNodes.length === 0) {
+		for (var i = 0; i < 3; i++) {
+			AddAttributeRow();
+		}
+	}
+	document.getElementById('RRLinkClientAttributesOverlay').style.display = 'block';
+}
+
+function CloseAttributesPanel() {
+	document.getElementById('RRLinkClientAttributesOverlay').style.display = 'none';
+}
+
+function ApplyAttributes() {
+	var rows = document.getElementById('RRLinkClientAttributesRows').childNodes;
+	var pairs = [];
+	for (var i = 0; i < rows.length; i++) {
+		var selects = rows[i].getElementsByTagName('select');
+		var inputs = rows[i].getElementsByTagName('input');
+		if (!selects.length || !inputs.length) continue;
+
+		var key = selects[0].value;
+		if (!key) continue;
+
+		var value = inputs[0].value;
+		pairs.push({ key: key, value: value.length ? value : null });
+	}
+
+	if (!pairs.length) {
+		CloseAttributesPanel();
+		return;
+	}
+
+	if (RRLinkClient.SetConversationAttributes(pairs)) {
+		RRLinkClient.FlushConversationAttributes();
+	}
+	CloseAttributesPanel();
+}
+
+
+// 画面表示時にまとめて実行
+window.onload = function() {
+	window.resizeTo(780, 620);
+	LoadSettings();
+	Connect();
+};
+
+// 終了時の処理
+window.onbeforeunload = function() {
+	RRLinkClient.Terminate();
+	RRLinkClient.Release();
+};
+
+// ]]>
+</script>
+	</head>
+	<body>
+		<form id="RRLinkClientPanels" class="panels" onsubmit="return false;">
+			<div class="panel">
+				<label class="label" for="RRLinkClientServiceName">
+					サービス名:
+					<input type="text" class="textbox" id="RRLinkClientServiceName" style="width: 220px;" onchange="SaveSettings()" />
+				</label>
+				<input type="button" class="button" value="再接続" onclick="Reconnect()" />
+			</div>
+
+			<div class="panel">
+				<input type="button" id="RRLinkClientStartRecordingButton" class="button" disabled="disabled" value="録音開始" onclick="RRLinkClient.StartRecording()" />
+				<input type="button" id="RRLinkClientStopRecordingButton"  class="button" disabled="disabled" value="録音停止" onclick="RRLinkClient.StopRecording()" />
+				<input type="button" id="RRLinkClientPauseRecordingButton" class="button" disabled="disabled" value="保留開始" onclick="RRLinkClient.PauseRecording()" />
+				<input type="button" id="RRLinkClientResumeRecordingButton" class="button" disabled="disabled" value="保留解除" onclick="RRLinkClient.ResumeRecording()" />
+			</div>
+
+			<div class="panel">
+				<input type="button" class="button" value="通話属性をまとめて設定..." onclick="OpenAttributesPanel()" />
+			</div>
+
+			<div class="panel">
+				<input type="button" class="button" value="チャンネル切替/音声再生ツールを起動" onclick="RRLinkClient.LaunchChannelSwitcher()" />
+			</div>
+		</form>
+
+		<div id="RRLinkClientOutput" class="output"></div>
+
+		<div id="RRLinkClientAttributesOverlay" class="modal-overlay">
+			<div class="modal-box">
+				<h2>通話属性をまとめて設定</h2>
+				<div id="RRLinkClientAttributesRows"></div>
+				<div class="modal-actions">
+					<input type="button" class="button" value="行を追加" onclick="AddAttributeRow()" />
+					<input type="button" class="button" value="設定して確定 (Flush)" onclick="ApplyAttributes()" />
+					<input type="button" class="button" value="閉じる" onclick="CloseAttributesPanel()" />
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
