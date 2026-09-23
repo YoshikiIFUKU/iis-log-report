@@ -304,11 +304,16 @@ try {
     $opt = New-Object IisLogReport.AggregatorOptions
     $opt.TargetExtensions = [string[]](ConvertTo-StringArray (Get-ConfigValue $config 'TargetExtensions' @('.aspx')))
     $opt.IncludeMethods = [string[]](ConvertTo-StringArray (Get-ConfigValue $config 'IncludeMethods' @()))
-    $opt.ExcludeStatusCodes = [int[]]@(Get-ConfigValue $config 'ExcludeStatusCodes' @() | ForEach-Object { [int]$_ })
-    $opt.ExcludeIpExact = [string[]](ConvertTo-StringArray (Get-ConfigValue $config 'ExcludeIpAddresses' @()))
-    $opt.ExcludeIpCidr = [string[]](ConvertTo-StringArray (Get-ConfigValue $config 'ExcludeIpRanges' @()))
-    $opt.ExcludeUserAgentContains = [string[]](ConvertTo-StringArray (Get-ConfigValue $config 'ExcludeUserAgentContains' @()))
+    # 社内 IP とボットは行を捨てずに IsInternal / IsBot の列で印を付ける。
+    # 旧設定 (ExcludeIpAddresses など) も読めるようにしておく。
+    $opt.InternalIpExact = [string[]](ConvertTo-StringArray (Get-ConfigValue $config 'InternalIpAddresses' `
+        (Get-ConfigValue $config 'ExcludeIpAddresses' @())))
+    $opt.InternalIpCidr = [string[]](ConvertTo-StringArray (Get-ConfigValue $config 'InternalIpRanges' `
+        (Get-ConfigValue $config 'ExcludeIpRanges' @())))
+    $opt.BotUserAgentContains = [string[]](ConvertTo-StringArray (Get-ConfigValue $config 'BotUserAgentContains' `
+        (Get-ConfigValue $config 'ExcludeUserAgentContains' @())))
     $opt.ExcludeUriPatterns = [string[]](ConvertTo-StringArray (Get-ConfigValue $config 'ExcludeUriPatterns' @()))
+    $opt.SessionTimeoutMinutes = [int](Get-ConfigValue $config 'SessionTimeoutMinutes' 30)
     $opt.ClientIpFields = [string[]](ConvertTo-StringArray (Get-ConfigValue $config 'ClientIpFields' @('c-ip')))
     $opt.LowercaseUrl = [bool](Get-ConfigValue $config 'LowercaseUrl' $true)
     $opt.StripTrailingSlash = [bool](Get-ConfigValue $config 'StripTrailingSlash' $false)
@@ -323,28 +328,45 @@ try {
         Write-Log "ファイル読み込みエラー: $err" 'ERROR'
         $script:HadError = $true
     }
-    Write-Log ("解析 {0:N0} 行 / 採用 {1:N0} 行 (拡張子外 {2:N0} / 除外IP {3:N0} / 条件除外 {4:N0} / 対象日外 {5:N0} / 不正 {6:N0})" -f `
-            $result.LinesRead, $result.LinesCounted, $result.LinesSkippedExtension, $result.LinesSkippedExcludedIp,
+    Write-Log ("解析 {0:N0} 行 / 採用 {1:N0} 行 (拡張子外 {2:N0} / 条件除外 {3:N0} / 対象日外 {4:N0} / 不正 {5:N0})" -f `
+            $result.LinesRead, $result.LinesCounted, $result.LinesSkippedExtension,
         $result.LinesSkippedFilter, $result.LinesSkippedOutOfRange, $result.LinesMalformed)
     $mbPerSec = if ($result.ElapsedSeconds -gt 0) { ($totalBytes / 1MB) / $result.ElapsedSeconds } else { 0 }
     Write-Log ("集計時間: {0:N1} 秒 ({1:N1} MB/秒, 並列度 {2})" -f $result.ElapsedSeconds, $mbPerSec,
         $(if ($opt.MaxDegreeOfParallelism -gt 0) { $opt.MaxDegreeOfParallelism } else { [Environment]::ProcessorCount }))
 
     # ---- CSV 出力 --------------------------------------------------------
+    # 出すのは「足し算できる数」だけ。平均や割合は BI 側で分子 ÷ 分母として計算する。
     $encoding = [string](Get-ConfigValue $config 'OutputEncoding' 'utf8')
-    $pageFormat = [string](Get-ConfigValue $config 'PageFileNameFormat' 'iis_page_{date}.csv')
-    $dailyFormat = [string](Get-ConfigValue $config 'DailyFileNameFormat' 'iis_daily_{date}.csv')
-    $writeDaily = [bool](Get-ConfigValue $config 'WriteDailySummary' $true)
-
-    $pagesByDate = @{}
-    foreach ($r in $result.Pages) {
-        if (-not $pagesByDate.ContainsKey($r.LogDate)) { $pagesByDate[$r.LogDate] = New-Object System.Collections.Generic.List[object] }
-        $pagesByDate[$r.LogDate].Add($r)
+    $formats = @{
+        request = [string](Get-ConfigValue $config 'RequestFileNameFormat' 'iis_request_{date}.csv')
+        unique  = [string](Get-ConfigValue $config 'UniqueFileNameFormat' 'iis_unique_{date}.csv')
+        visit   = [string](Get-ConfigValue $config 'VisitFileNameFormat' 'iis_visit_{date}.csv')
+        flow    = [string](Get-ConfigValue $config 'FlowFileNameFormat' 'iis_flow_{date}.csv')
+        user    = [string](Get-ConfigValue $config 'UserFileNameFormat' 'iis_user_{date}.csv')
     }
-    $dailyByDate = @{}
-    foreach ($r in $result.Daily) {
-        if (-not $dailyByDate.ContainsKey($r.LogDate)) { $dailyByDate[$r.LogDate] = New-Object System.Collections.Generic.List[object] }
-        $dailyByDate[$r.LogDate].Add($r)
+    $columns = @{
+        request = @('ServerName', 'LogDate', 'PageUrl', 'PageUrlDisplay', 'Method', 'StatusClass', 'IsInternal', 'IsBot',
+            'Requests', 'TimeTakenSumMs', 'TimeTakenMaxMs', 'BytesSentSum', 'T100', 'T300', 'T1000', 'T3000', 'T10000', 'TOver')
+        unique  = @('Scope', 'Segment', 'ServerName', 'LogDate', 'PageUrl', 'PageUrlDisplay', 'UniqueUsers', 'UniqueIps')
+        visit   = @('Scope', 'Segment', 'ServerName', 'LogDate', 'Visits', 'PageViewsInVisits', 'DistinctPagesInVisitsSum',
+            'DurationSecSum', 'SinglePageVisits', 'V1', 'V2to3', 'V4to10', 'V11over', 'D0', 'D30', 'D180', 'D600', 'DOver')
+        flow    = @('Scope', 'Segment', 'ServerName', 'LogDate', 'PageUrl', 'PageUrlDisplay', 'EntryCount', 'ExitCount', 'BounceCount')
+        user    = @('Scope', 'Segment', 'ServerName', 'LogDate', 'Users', 'PageViewsSum', 'DistinctPagesPerUserSum',
+            'Users1Page', 'Users2to5', 'Users6over')
+    }
+
+    # 日付ごとに仕分ける (CSV は日ごとに 1 本ずつ出す)
+    $byDate = @{}
+    foreach ($kind in 'request', 'unique', 'visit', 'flow', 'user') { $byDate[$kind] = @{} }
+    $sets = @{ request = $result.Requests; unique = $result.Uniques; visit = $result.Visits; flow = $result.Flows; user = $result.Users }
+    foreach ($kind in $sets.Keys) {
+        foreach ($r in $sets[$kind]) {
+            if (-not $byDate[$kind].ContainsKey($r.LogDate)) {
+                $byDate[$kind][$r.LogDate] = New-Object System.Collections.Generic.List[object]
+            }
+            $byDate[$kind][$r.LogDate].Add($r)
+        }
     }
 
     # 対象ページへのアクセスが 0 件でも、その日のログを読めたサーバは 0 の行として出す。
@@ -370,71 +392,80 @@ try {
         $iso = $d.ToString('yyyy-MM-dd')
         $stamp = $d.ToString('yyyyMMdd')
 
-        # ページ別 CSV
-        $path = Join-Path $outDir ($pageFormat -replace '\{date\}', $stamp)
-        if ((Test-Path -LiteralPath $path) -and -not $Force) {
-            Write-Log "既に存在するためスキップします (上書きするには -Force): $path" 'WARN'
+        $rows = @{}
+        foreach ($kind in 'request', 'unique', 'visit', 'flow', 'user') {
+            $list = New-Object System.Collections.Generic.List[object]
+            if ($byDate[$kind].ContainsKey($iso)) { $list.AddRange($byDate[$kind][$iso]) }
+            $rows[$kind] = $list
         }
-        else {
-            $rows = if ($pagesByDate.ContainsKey($iso)) { $pagesByDate[$iso] } else { @() }
+
+        # アクセス 0 件のサーバの行を足す (人数・訪問・利用者の 3 本。明細と入口出口は行の作りようがない)
+        $zeroCount = 0
+        if ($loggedServersByDate.ContainsKey($stamp)) {
+            foreach ($segment in 'all', 'human') {
+                $present = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+                foreach ($r in $rows['unique']) {
+                    if ($r.Scope -eq 'server-day' -and $r.Segment -eq $segment) { [void]$present.Add($r.ServerName) }
+                }
+                foreach ($server in $loggedServersByDate[$stamp]) {
+                    if ($present.Contains($server)) { continue }
+                    $zeroCount++
+                    foreach ($kind in 'unique', 'visit', 'user') {
+                        $z = New-Object ("IisLogReport." + $(switch ($kind) { 'unique' { 'UniqueRow' } 'visit' { 'VisitRow' } 'user' { 'UserRow' } }))
+                        $z.Scope = 'server-day'; $z.Segment = $segment
+                        $z.ServerName = $server; $z.LogDate = $iso
+                        if ($kind -eq 'unique') { $z.PageUrl = ''; $z.PageUrlDisplay = '' }
+                        $rows[$kind].Add($z)
+                    }
+                }
+                # その日どのサーバにもアクセスが無い場合は、全サーバ合算の行も 0 で出す
+                $hasAll = $false
+                foreach ($r in $rows['unique']) {
+                    if ($r.Scope -eq 'all-day' -and $r.Segment -eq $segment) { $hasAll = $true; break }
+                }
+                if (-not $hasAll) {
+                    foreach ($kind in 'unique', 'visit', 'user') {
+                        $z = New-Object ("IisLogReport." + $(switch ($kind) { 'unique' { 'UniqueRow' } 'visit' { 'VisitRow' } 'user' { 'UserRow' } }))
+                        $z.Scope = 'all-day'; $z.Segment = $segment
+                        $z.ServerName = ''; $z.LogDate = $iso
+                        if ($kind -eq 'unique') { $z.PageUrl = ''; $z.PageUrlDisplay = '' }
+                        $rows[$kind].Add($z)
+                    }
+                }
+            }
+            foreach ($kind in 'unique', 'visit', 'user') {
+                $rows[$kind] = @($rows[$kind] | Sort-Object -Property LogDate, Segment, Scope, ServerName -CaseSensitive)
+            }
+        }
+
+        foreach ($kind in 'request', 'unique', 'visit', 'flow', 'user') {
+            $path = Join-Path $outDir ($formats[$kind] -replace '\{date\}', $stamp)
+            if ((Test-Path -LiteralPath $path) -and -not $Force) {
+                Write-Log "既に存在するためスキップします (上書きするには -Force): $path" 'WARN'
+                continue
+            }
+            $cols = $columns[$kind]
             # 途中で落ちても壊れたファイルを残さないよう、一時ファイルに書いてから置き換える
             $tmp = "$path.tmp"
             $w = New-CsvWriter -Path $tmp -Encoding $encoding
             try {
-                $w.WriteLine('ServerName,LogDate,PageUrl,PageUrlDisplay,PageViews,UniqueUsers,UniqueIps,AvgTimeTakenMs,MaxTimeTakenMs,ErrorCount')
-                foreach ($r in $rows) {
-                    $w.WriteLine(('{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}' -f `
-                        (Get-CsvField $r.ServerName), $r.LogDate, (Get-CsvField $r.PageUrl), (Get-CsvField $r.PageUrlDisplay),
-                            $r.PageViews, $r.UniqueUsers, $r.UniqueIps, $r.AvgTimeTakenMs, $r.MaxTimeTakenMs, $r.ErrorCount))
+                $w.WriteLine($cols -join ',')
+                foreach ($r in $rows[$kind]) {
+                    $values = New-Object System.Collections.Generic.List[string]
+                    foreach ($c in $cols) {
+                        $v = $r.$c
+                        if ($v -is [string]) { $values.Add((Get-CsvField $v)) } else { $values.Add([string]$v) }
+                    }
+                    $w.WriteLine($values -join ',')
                 }
             }
             finally { $w.Dispose() }
             Move-Item -LiteralPath $tmp -Destination $path -Force
-            Write-Log ("出力: {0} ({1:N0} 行)" -f $path, $rows.Count)
-            if ($rows.Count -eq 0) { Write-Log "$iso のデータが 0 件でした。ログの有無と除外設定を確認してください。" 'WARN' }
+            Write-Log ("出力: {0} ({1:N0} 行)" -f $path, $rows[$kind].Count)
         }
-
-        # サーバ × 日 サマリ CSV
-        # ユニーク人数はページ別 CSV を足し上げても求まらない (同じ人が複数ページを見るため)。
-        # BI 側で正しい人数を出せるよう、日単位の実測値を別ファイルで持つ。
-        if ($writeDaily) {
-            $dpath = Join-Path $outDir ($dailyFormat -replace '\{date\}', $stamp)
-            if ((Test-Path -LiteralPath $dpath) -and -not $Force) {
-                Write-Log "既に存在するためスキップします (上書きするには -Force): $dpath" 'WARN'
-            }
-            else {
-                $drows = New-Object System.Collections.Generic.List[object]
-                if ($dailyByDate.ContainsKey($iso)) { $drows.AddRange($dailyByDate[$iso]) }
-                $zeroCount = 0
-                if ($loggedServersByDate.ContainsKey($stamp)) {
-                    $present = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
-                    foreach ($r in $drows) { [void]$present.Add($r.ServerName) }
-                    foreach ($server in $loggedServersByDate[$stamp]) {
-                        if ($present.Contains($server)) { continue }
-                        $z = New-Object IisLogReport.DailyRow
-                        $z.ServerName = $server
-                        $z.LogDate = $iso
-                        $drows.Add($z)
-                        $zeroCount++
-                    }
-                }
-                $drows = @($drows | Sort-Object -Property ServerName -CaseSensitive)
-                $tmp = "$dpath.tmp"
-                $w = New-CsvWriter -Path $tmp -Encoding $encoding
-                try {
-                    $w.WriteLine('ServerName,LogDate,PageViews,UniqueUsers,UniqueIps,PageCount,AvgTimeTakenMs,ErrorCount')
-                    foreach ($r in $drows) {
-                        # アクセス 0 件の平均応答時間は「0 ミリ秒」ではなく値なしなので空欄にする
-                        $avg = if ($r.PageViews -gt 0) { $r.AvgTimeTakenMs } else { '' }
-                        $w.WriteLine(('{0},{1},{2},{3},{4},{5},{6},{7}' -f `
-                            (Get-CsvField $r.ServerName), $r.LogDate, $r.PageViews, $r.UniqueUsers,
-                                $r.UniqueIps, $r.PageCount, $avg, $r.ErrorCount))
-                    }
-                }
-                finally { $w.Dispose() }
-                Move-Item -LiteralPath $tmp -Destination $dpath -Force
-                Write-Log ("出力: {0} ({1:N0} 行, うちアクセス 0 件のサーバ {2} 行)" -f $dpath, $drows.Count, $zeroCount)
-            }
+        if ($zeroCount -gt 0) { Write-Log ("アクセス 0 件のサーバを {0} 件、0 の行として出力しました。" -f $zeroCount) }
+        if ($rows['request'].Count -eq 0) {
+            Write-Log "$iso のリクエスト明細が 0 件でした。ログの有無と対象拡張子の設定を確認してください。" 'WARN'
         }
     }
 

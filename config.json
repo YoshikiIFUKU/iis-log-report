@@ -7,24 +7,27 @@
   "Servers": [],
 
   "TargetExtensions": [".aspx"],
-  "IncludeMethods": ["GET", "POST"],
-  "ExcludeStatusCodes": [],
+  "IncludeMethods": [],
   "LowercaseUrl": true,
   "StripTrailingSlash": false,
 
-  "ExcludeIpAddresses": ["127.0.0.1", "::1"],
-  "ExcludeIpRanges": ["10.0.0.0/8", "192.168.0.0/16", "172.16.0.0/12"],
+  "InternalIpAddresses": ["127.0.0.1", "::1"],
+  "InternalIpRanges": ["10.0.0.0/8", "192.168.0.0/16", "172.16.0.0/12"],
   "ClientIpFields": ["c-ip"],
 
-  "ExcludeUserAgentContains": ["bot", "crawler", "spider", "slurp", "bingpreview", "pingdom", "uptimerobot", "healthcheck"],
+  "BotUserAgentContains": ["bot", "crawler", "spider", "slurp", "bingpreview", "pingdom", "uptimerobot", "healthcheck"],
   "ExcludeUriPatterns": ["^/elmah\\.axd", "^/trace\\.axd"],
+
+  "SessionTimeoutMinutes": 30,
 
   "LogTimeIsUtc": true,
   "TimeZoneOffsetHours": 9,
 
-  "PageFileNameFormat": "iis_page_{date}.csv",
-  "DailyFileNameFormat": "iis_daily_{date}.csv",
-  "WriteDailySummary": true,
+  "RequestFileNameFormat": "iis_request_{date}.csv",
+  "UniqueFileNameFormat": "iis_unique_{date}.csv",
+  "VisitFileNameFormat": "iis_visit_{date}.csv",
+  "FlowFileNameFormat": "iis_flow_{date}.csv",
+  "UserFileNameFormat": "iis_user_{date}.csv",
   "OutputEncoding": "utf8",
   "RetentionDays": 0,
 

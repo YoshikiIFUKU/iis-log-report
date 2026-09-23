@@ -34,7 +34,7 @@ foreach ($server in $Servers) {
         $sw.WriteLine('#Software: Microsoft Internet Information Services 10.0')
         $sw.WriteLine('#Version: 1.0')
         $sw.WriteLine("#Date: $dateIso 00:00:00")
-        $sw.WriteLine('#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken')
+        $sw.WriteLine('#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status sc-bytes cs-bytes time-taken')
         for ($i = 0; $i -lt $LinesPerFile; $i++) {
             $sec = $rand.Next(0, 86400)
             $time = ([timespan]::FromSeconds($sec)).ToString('hh\:mm\:ss')
@@ -61,8 +61,10 @@ foreach ($server in $Servers) {
             $user = if ($rand.NextDouble() -lt 0.3) { "CORP\u{0}" -f $rand.Next(1, 60) } else { '-' }
             $status = if ($rand.NextDouble() -lt 0.03) { 500 } elseif ($rand.NextDouble() -lt 0.05) { 404 } else { 200 }
             $taken = $rand.Next(5, 3000)
+            $scBytes = $rand.Next(500, 80000)
+            $csBytes = $rand.Next(200, 2000)
 
-            $sw.WriteLine("$dateIso $time 192.168.10.5 GET $uri $query 443 $user $ip $ua - $status 0 0 $taken")
+            $sw.WriteLine("$dateIso $time 192.168.10.5 GET $uri $query 443 $user $ip $ua - $status 0 0 $scBytes $csBytes $taken")
         }
     }
     finally { $sw.Dispose() }
